@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/><stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <!-- shield -->
+  <path d="M24 3 L42 9 V23 C42 34 34 42 24 45 C14 42 6 34 6 23 V9 Z" fill="url(#g)" fill-opacity="0.12" stroke="url(#g)" stroke-width="2"/>
+  <!-- radar sweep rings -->
+  <circle cx="24" cy="23" r="11" stroke="url(#g)" stroke-width="1.5" stroke-opacity="0.45"/>
+  <circle cx="24" cy="23" r="6" stroke="url(#g)" stroke-width="1.5" stroke-opacity="0.7"/>
+  <!-- scan beam + dot -->
+  <path d="M24 23 L24 12" stroke="url(#g)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="30" cy="28" r="2.4" fill="#34d399"/>
+</svg>

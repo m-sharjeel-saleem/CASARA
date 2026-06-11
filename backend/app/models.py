@@ -1,0 +1,40 @@
+"""Domain models shared across the pipeline and the API."""
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+Severity = Literal["info", "low", "medium", "high", "critical"]
+Confidence = Literal["LOW", "MEDIUM", "HIGH"]
+ReviewStatus = Literal["pending", "running", "completed", "failed"]
+
+# Which scanner sources count toward the SAST dimension of the risk score.
+SAST_SOURCES = {"semgrep", "bandit"}
+
+
+class Finding(BaseModel):
+    source: str                      # scanner or agent name, e.g. "semgrep", "security-agent"
+    file: str = ""
+    line: int | None = None
+    cwe_id: str = ""
+    severity: Severity = "medium"
+    cvss_estimate: float = 0.0
+    message: str = ""
+    fix_prompt: str = ""
+    confidence: Confidence = "MEDIUM"
+    verified: bool = False            # confirmed by >=2 sources (deterministic + agent)
+
+
+class Review(BaseModel):
+    id: str
+    repo: str
+    pr_number: int
+    pr_title: str = ""
+    author: str = ""
+    head_sha: str = ""
+    status: ReviewStatus = "pending"
+    risk_score: float = 0.0
+    gated: bool = False
+    summary: str = ""
+    findings: list[Finding] = Field(default_factory=list)
+    created_at: str = ""
+    completed_at: str | None = None

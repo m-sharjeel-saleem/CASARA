@@ -1,0 +1,17 @@
+# --- Web framework (lean: FastAPI background tasks, no Celery/Redis) ---
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+sse-starlette==2.1.3
+
+# --- Integrations ---
+httpx==0.28.1
+
+# --- Dev / tests ---
+pytest==8.3.4
+ruff==0.8.3
+
+# Storage uses the stdlib sqlite3 module — no external DB required.
+# Scanners (semgrep, bandit, gitleaks) are external CLIs; install separately
+# (pip install semgrep bandit; brew install gitleaks). They degrade gracefully.
