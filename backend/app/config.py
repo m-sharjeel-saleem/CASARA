@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     risk_gate_threshold: float = 7.0
     max_autofixes: int = 3  # max one-click suggested fixes posted per PR (bounds LLM cost)
 
+    # Billing: free-tier monthly review cap per installation. 0 = unlimited (no cap enforced).
+    free_monthly_reviews: int = 0
+
     # Storage. SQLite by default (local/dev). Set SUPABASE_URL + SUPABASE_SERVICE_KEY
     # to switch the store backend to Supabase (hosted, multi-tenant) automatically.
     database_path: str = "casara.db"

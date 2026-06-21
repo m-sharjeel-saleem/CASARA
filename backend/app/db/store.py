@@ -51,3 +51,11 @@ def set_installation_suspended(inst_id: int, suspended: bool) -> None:
 
 def delete_installation(inst_id: int) -> None:
     _backend().delete_installation(inst_id)
+
+
+def incr_usage(inst_id: int, period: str) -> int:
+    return _backend().incr_usage(inst_id, period)
+
+
+def get_usage(inst_id: int, period: str) -> int:
+    return _backend().get_usage(inst_id, period)

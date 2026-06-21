@@ -160,6 +160,22 @@ def test_tenant_installation_lifecycle():
     on_installation("deleted", inst)  # should not raise
 
 
+def test_metering_counts_and_caps(monkeypatch):
+    from app.config import get_settings
+    from app.services import metering
+    period = metering.current_period()
+    assert metering.record_review(555) == 1
+    assert metering.record_review(555) == 2
+    assert store.get_usage(555, period) == 2
+    # No cap configured → never over limit.
+    assert metering.over_free_limit(555) is False
+    # Set a cap of 2 and confirm it trips.
+    get_settings.cache_clear()
+    monkeypatch.setenv("FREE_MONTHLY_REVIEWS", "2")
+    assert metering.over_free_limit(555) is True
+    get_settings.cache_clear()
+
+
 def test_review_persists_installation_id():
     r = Review(id="inst1", repo="o/r", pr_number=7, installation_id=4242,
                status="completed", created_at="2026-01-01T00:00:00Z")

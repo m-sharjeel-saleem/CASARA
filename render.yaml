@@ -41,6 +41,8 @@ services:
         value: "7.0"
       - key: MAX_AUTOFIXES
         value: "3"
+      - key: FREE_MONTHLY_REVIEWS
+        value: "0"
       # Your Vercel frontend origin(s), comma-separated.
       - key: CORS_ORIGINS
         sync: false

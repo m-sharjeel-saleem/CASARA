@@ -16,7 +16,7 @@ from app.core import events
 from app.core.risk import compute_risk, should_gate
 from app.db import store
 from app.models import Finding, Review
-from app.services import github, scanners
+from app.services import github, metering, scanners
 
 log = logging.getLogger("casara.review")
 
@@ -126,6 +126,20 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
     )
     store.save_review(review)
     events.publish("review.started", review.model_dump())
+
+    # Free-tier cap: stop before any cost-incurring work if the tenant is over limit.
+    if metering.over_free_limit(installation_id):
+        cap = get_settings().free_monthly_reviews
+        review.status = "completed"
+        review.summary = (f"This installation has used its free allowance of {cap} reviews this "
+                          f"month. Upgrade to continue automated reviews.")
+        review.completed_at = _now()
+        github.post_comment(repo, pr_number,
+                            f"## 🧭 CASARA\n\n⏳ {review.summary}", installation_id)
+        store.save_review(review)
+        events.publish("review.completed", review.model_dump())
+        return review
+    metering.record_review(installation_id)
 
     try:
         files = github.changed_files(repo, pr_number, installation_id)

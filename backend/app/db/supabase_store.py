@@ -102,6 +102,29 @@ def delete_installation(inst_id: int) -> None:
         c.delete(f"{base}/installations", headers=headers, params={"id": f"eq.{inst_id}"})
 
 
+def get_usage(inst_id: int, period: str) -> int:
+    base, headers = _rest()
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{base}/usage_counters", headers=headers, params={
+            "installation_id": f"eq.{inst_id}", "period": f"eq.{period}",
+            "select": "reviews_run", "limit": 1,
+        })
+        rows = r.json() if r.status_code < 300 else []
+    return rows[0]["reviews_run"] if rows else 0
+
+
+def incr_usage(inst_id: int, period: str) -> int:
+    # Read-modify-write; fine at our volume (one increment per review).
+    current = get_usage(inst_id, period)
+    base, headers = _rest()
+    headers = {**headers, "Prefer": "resolution=merge-duplicates"}
+    with httpx.Client(timeout=30) as c:
+        c.post(f"{base}/usage_counters", headers=headers, json={
+            "installation_id": inst_id, "period": period, "reviews_run": current + 1,
+        })
+    return current + 1
+
+
 def stats(installation_id: int | None = None) -> dict:
     reviews = list_reviews(limit=1000, installation_id=installation_id)
     done = [r for r in reviews if r.status == "completed"]

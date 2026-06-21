@@ -280,3 +280,32 @@ final handoff checklist at the end of this session.
 
 > Phase 4 (Stripe billing) is intentionally last — per your decision, we validate that people install
 > and use it *before* building the paywall. The schema already has `usage_counters` + `plan` ready for it.
+
+---
+
+### Step 7 — Usage metering + free-tier cap (Phase 4, the billing data layer)
+
+**The problem it solves:** To charge money you must (a) count what each customer uses and (b) be able
+to cut off the free tier. We built both now — *without* Stripe — so the moment you add a Stripe
+account, the paywall is a small final wire-up, not a rebuild.
+
+**Files touched:**
+- `app/db/*` — added `usage_counters` table + `incr_usage()` / `get_usage()` to both stores and the
+  dispatcher. Counts reviews per installation per calendar month (`YYYY-MM`).
+- `app/services/metering.py` *(new)* — `record_review()` (increment) and `over_free_limit()` (check
+  against `FREE_MONTHLY_REVIEWS`).
+- `app/services/review.py` — before any cost-incurring work, `run_review` checks the cap: if a free
+  tenant is over limit it posts a friendly "upgrade to continue" comment and stops; otherwise it
+  records one unit of usage and proceeds.
+- `app/config.py` — `free_monthly_reviews` (default `0` = unlimited, so nothing is capped until you
+  decide to meter).
+
+**What's left for actual billing (the ONLY money step, needs your Stripe account):** a Stripe
+checkout link + a webhook that flips an installation's `plan` from `free` to `pro` and lifts the cap.
+That's ~1 file once you have Stripe keys. Everything it depends on (counters, plan column, cap check)
+is already in place.
+
+**Tests added:** `test_metering_counts_and_caps`. **25 tests passing.**
+
+**Status: build complete for everything that doesn't need your credentials.** See the handoff
+checklist (end of session / your chat) for the exact list of accounts and keys to plug in.

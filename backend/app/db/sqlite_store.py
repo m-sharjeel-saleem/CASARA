@@ -40,6 +40,14 @@ create table if not exists installations (
     created_at   text,
     suspended    integer default 0
 );
+
+-- Per-installation monthly review count (free-tier cap / future billing).
+create table if not exists usage_counters (
+    installation_id integer,
+    period          text,
+    reviews_run     integer default 0,
+    primary key (installation_id, period)
+);
 """
 
 
@@ -123,6 +131,31 @@ def set_installation_suspended(inst_id: int, suspended: bool) -> None:
 def delete_installation(inst_id: int) -> None:
     with _conn() as con:
         con.execute("delete from installations where id=?", (inst_id,))
+
+
+def incr_usage(inst_id: int, period: str) -> int:
+    with _conn() as con:
+        con.execute(
+            """insert into usage_counters (installation_id, period, reviews_run)
+               values (?,?,1)
+               on conflict(installation_id, period)
+               do update set reviews_run = reviews_run + 1""",
+            (inst_id, period),
+        )
+        row = con.execute(
+            "select reviews_run from usage_counters where installation_id=? and period=?",
+            (inst_id, period),
+        ).fetchone()
+        return row["reviews_run"] if row else 0
+
+
+def get_usage(inst_id: int, period: str) -> int:
+    with _conn() as con:
+        row = con.execute(
+            "select reviews_run from usage_counters where installation_id=? and period=?",
+            (inst_id, period),
+        ).fetchone()
+        return row["reviews_run"] if row else 0
 
 
 def stats() -> dict:
