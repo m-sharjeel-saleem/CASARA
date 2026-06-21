@@ -27,10 +27,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _materialize(repo: str, files: list[str], ref: str, root: str) -> None:
+def _materialize(repo: str, files: list[str], ref: str, root: str,
+                 installation_id: int | None = None) -> None:
     """Write the PR's changed files into a temp dir so scanners can run on them."""
     for path in files:
-        content = github.fetch_file(repo, path, ref)
+        content = github.fetch_file(repo, path, ref, installation_id)
         if content is None:
             continue
         dest = os.path.join(root, path)
@@ -91,6 +92,7 @@ def _post_fixes(review: Review, max_fixes: int) -> int:
     """
     if max_fixes <= 0:
         return 0
+    iid = review.installation_id
     posted = 0
     file_cache: dict[str, str | None] = {}
     for f in review.findings:
@@ -99,7 +101,7 @@ def _post_fixes(review: Review, max_fixes: int) -> int:
         if not f.file or not f.line:
             continue
         if f.file not in file_cache:
-            file_cache[f.file] = github.fetch_file(review.repo, f.file, review.head_sha)
+            file_cache[f.file] = github.fetch_file(review.repo, f.file, review.head_sha, iid)
         sug = autofix.generate(f, file_cache[f.file])
         if sug is None:
             continue
@@ -107,29 +109,31 @@ def _post_fixes(review: Review, max_fixes: int) -> int:
                 f"{sug.explanation or f.message}")
         if github.post_suggestion(
             review.repo, review.pr_number, review.head_sha, sug.file,
-            sug.start_line, sug.end_line, sug.replacement, body,
+            sug.start_line, sug.end_line, sug.replacement, body, iid,
         ):
             posted += 1
     return posted
 
 
-def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: str) -> Review:
+def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: str,
+               installation_id: int | None = None) -> Review:
     from app.config import get_settings
 
     review = Review(
         id=uuid.uuid4().hex[:12], repo=repo, pr_number=pr_number, pr_title=pr_title,
-        author=author, head_sha=head_sha, status="running", created_at=_now(),
+        author=author, head_sha=head_sha, installation_id=installation_id,
+        status="running", created_at=_now(),
     )
     store.save_review(review)
     events.publish("review.started", review.model_dump())
 
     try:
-        files = github.changed_files(repo, pr_number)
-        diff = github.get_diff(repo, pr_number)
+        files = github.changed_files(repo, pr_number, installation_id)
+        diff = github.get_diff(repo, pr_number, installation_id)
 
         scanner_findings: list[Finding] = []
         with tempfile.TemporaryDirectory() as root:
-            _materialize(repo, files, head_sha, root)
+            _materialize(repo, files, head_sha, root, installation_id)
             scanner_findings = scanners.scan_directory(root)
 
         agent_findings = (
@@ -147,12 +151,14 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         review.status = "completed"
         review.completed_at = _now()
 
-        github.post_comment(repo, pr_number, _comment(review, breakdown, gate_reason))
+        github.post_comment(repo, pr_number,
+                            _comment(review, breakdown, gate_reason), installation_id)
         _post_fixes(review, get_settings().max_autofixes)
         github.set_status(
             repo, head_sha, gated=review.gated,
             description=(f"blocked — {gate_reason}" if review.gated
                          else f"passed — risk {review.risk_score}/10"),
+            installation_id=installation_id,
         )
     except Exception as e:  # noqa: BLE001 — record failure rather than crash the worker
         log.exception("review failed: %s", e)

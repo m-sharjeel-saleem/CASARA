@@ -170,3 +170,50 @@ The value is built. **Phase 2 makes it installable by strangers (GitHub App), th
 > ⚠️ **Honest note on the IOC list:** the malicious-package list in `depscan.py` is a small, static
 > starter set. A real product needs a maintained threat-intel feed (one of the open questions from our
 > research). For launch it's fine; flag it as a "known limitation / roadmap" item.
+
+---
+
+### Step 4 — GitHub App (Phase 2, the "installable by strangers" step)
+
+**The problem it solves:** A Personal Access Token (PAT) is *your* personal credential — it can't be
+the basis of a product other people use. A **GitHub App** is installed per-org/repo and CASARA
+authenticates *as each installation*. This is the single change that turns CASARA from a personal
+script into a multi-tenant product someone can click "Install" on. (You decided: get it installable
+first, add billing later.)
+
+**How GitHub App auth works (worth understanding):**
+1. The App has a **private key**. We sign a short-lived **JWT** with it (RS256) — that proves "we are
+   this App."
+2. We exchange that JWT for an **installation access token** scoped to *one* customer's repos.
+3. We use that token for API calls on that installation's behalf. Tokens last ~1h, so we cache them.
+
+**Files touched:**
+- `app/services/gh_app.py` *(new)* — `installation_token(installation_id)` (JWT → token, cached until
+  near expiry) and `list_installations()`. Uses `PyJWT` + `cryptography` (added to requirements).
+- `app/config.py` — added App settings (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, client id/secret,
+  slug) + `github_app_enabled` + a `private_key_pem` helper that un-escapes `\n` (for single-line env
+  UIs on hosting platforms).
+- `app/services/github.py` — `_auth_token(installation_id)` now **prefers an App installation token
+  and falls back to the PAT**. Every API function (`get_pr`, `get_diff`, `changed_files`,
+  `fetch_file`, `post_comment`, `post_suggestion`, `set_status`) takes an optional `installation_id`.
+  *Local/dev still works with just a PAT — nothing breaks.*
+- `app/models.py` — `Review.installation_id` (the tenant marker).
+- `app/services/review.py` + `app/services/tenants.py` *(new)* — `run_review` carries the
+  installation through the whole pipeline; `on_installation()` records/suspends/removes installs.
+- `app/api/webhooks.py` — now also handles `installation` / `installation_repositories` events and
+  extracts `installation.id` from `pull_request` events.
+- `app/db/store.py` — new `installations` table + `installation_id` column on reviews.
+- `app/api/dashboard.py` — `GET /api/install` returns the public install URL for an "Install" button.
+- `docs/GITHUB_APP_SETUP.md` *(new)* — **the click-through steps YOU do in GitHub's UI** to register
+  the App (permissions, events, keys). This is the only manual part; once the keys are in `.env`,
+  everything is automatic.
+
+**What you need to do (one time):** follow `docs/GITHUB_APP_SETUP.md` to create the App and paste 5
+values into `.env`. We can do this together when we deploy (Phase 5) since the webhook needs a public
+URL.
+
+**Tests added:** `test_github_falls_back_to_pat_when_no_app`, `test_tenant_installation_lifecycle`,
+`test_review_persists_installation_id`. **24 tests passing.**
+
+**Status after Phase 2:** CASARA is now *architecturally* a multi-tenant, installable product. Next
+(Phase 3) we add real customer accounts + data isolation on Supabase, then deploy it live (Phase 5).

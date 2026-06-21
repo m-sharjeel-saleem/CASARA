@@ -29,6 +29,7 @@ class Review(BaseModel):
     id: str
     repo: str
     pr_number: int
+    installation_id: int | None = None   # GitHub App installation (the tenant); None in PAT mode
     pr_title: str = ""
     author: str = ""
     head_sha: str = ""

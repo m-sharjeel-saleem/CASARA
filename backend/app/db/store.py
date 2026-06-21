@@ -13,22 +13,33 @@ from app.models import Review
 
 _SCHEMA = """
 create table if not exists reviews (
-    id            text primary key,
-    repo          text not null,
-    pr_number     integer not null,
-    pr_title      text,
-    author        text,
-    head_sha      text,
-    status        text,
-    risk_score    real,
-    gated         integer,
-    summary       text,
-    findings_json text,
-    created_at    text,
-    completed_at  text
+    id              text primary key,
+    repo            text not null,
+    pr_number       integer not null,
+    installation_id integer,
+    pr_title        text,
+    author          text,
+    head_sha        text,
+    status          text,
+    risk_score      real,
+    gated           integer,
+    summary         text,
+    findings_json   text,
+    created_at      text,
+    completed_at    text
 );
 create index if not exists reviews_repo_idx on reviews (repo);
 create index if not exists reviews_created_idx on reviews (created_at desc);
+
+-- One row per GitHub App installation (the tenant boundary until Supabase takes over).
+create table if not exists installations (
+    id           integer primary key,
+    account      text,
+    account_type text,
+    repo_count   integer,
+    created_at   text,
+    suspended    integer default 0
+);
 """
 
 
@@ -52,16 +63,17 @@ def save_review(review: Review) -> None:
     with _conn() as con:
         con.execute(
             """insert into reviews
-               (id, repo, pr_number, pr_title, author, head_sha, status, risk_score,
-                gated, summary, findings_json, created_at, completed_at)
-               values (?,?,?,?,?,?,?,?,?,?,?,?,?)
+               (id, repo, pr_number, installation_id, pr_title, author, head_sha, status,
+                risk_score, gated, summary, findings_json, created_at, completed_at)
+               values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                on conflict(id) do update set
                  status=excluded.status, risk_score=excluded.risk_score,
                  gated=excluded.gated, summary=excluded.summary,
                  findings_json=excluded.findings_json, completed_at=excluded.completed_at""",
             (
-                review.id, review.repo, review.pr_number, review.pr_title, review.author,
-                review.head_sha, review.status, review.risk_score, int(review.gated),
+                review.id, review.repo, review.pr_number, review.installation_id,
+                review.pr_title, review.author, review.head_sha, review.status,
+                review.risk_score, int(review.gated),
                 review.summary, json.dumps([f.model_dump() for f in review.findings]),
                 review.created_at, review.completed_at,
             ),
@@ -87,6 +99,30 @@ def list_reviews(limit: int = 50) -> list[Review]:
             "select * from reviews order by created_at desc limit ?", (limit,)
         ).fetchall()
         return [_row_to_review(r) for r in rows]
+
+
+def upsert_installation(inst_id: int, account: str, account_type: str,
+                        repo_count: int, created_at: str) -> None:
+    with _conn() as con:
+        con.execute(
+            """insert into installations (id, account, account_type, repo_count, created_at, suspended)
+               values (?,?,?,?,?,0)
+               on conflict(id) do update set
+                 account=excluded.account, account_type=excluded.account_type,
+                 repo_count=excluded.repo_count, suspended=0""",
+            (inst_id, account, account_type, repo_count, created_at),
+        )
+
+
+def set_installation_suspended(inst_id: int, suspended: bool) -> None:
+    with _conn() as con:
+        con.execute("update installations set suspended=? where id=?",
+                    (int(suspended), inst_id))
+
+
+def delete_installation(inst_id: int) -> None:
+    with _conn() as con:
+        con.execute("delete from installations where id=?", (inst_id,))
 
 
 def stats() -> dict:

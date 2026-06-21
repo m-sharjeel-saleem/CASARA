@@ -144,6 +144,30 @@ def test_depscan_feeds_sca_dimension():
     assert breakdown["S_sca"] == 9.5
 
 
+def test_github_falls_back_to_pat_when_no_app(monkeypatch):
+    # With no App configured and no PAT, GitHub is disabled (no auth token).
+    from app.services import github
+    assert github._auth_token(installation_id=12345) is None
+    assert github._enabled(installation_id=12345) is False
+
+
+def test_tenant_installation_lifecycle():
+    from app.services.tenants import on_installation
+    inst = {"id": 999, "account": {"login": "acme", "type": "Organization"},
+            "repository_selection": "all"}
+    on_installation("created", inst)
+    on_installation("suspend", inst)
+    on_installation("deleted", inst)  # should not raise
+
+
+def test_review_persists_installation_id():
+    r = Review(id="inst1", repo="o/r", pr_number=7, installation_id=4242,
+               status="completed", created_at="2026-01-01T00:00:00Z")
+    store.save_review(r)
+    got = store.get_review("inst1")
+    assert got is not None and got.installation_id == 4242
+
+
 def test_store_roundtrip():
     r = Review(id="abc123", repo="o/r", pr_number=5, status="completed",
                risk_score=4.2, findings=[_f()], created_at="2026-01-01T00:00:00Z")

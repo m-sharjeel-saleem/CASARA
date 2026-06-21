@@ -13,6 +13,21 @@ from app.services.review import run_review
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
+@router.get("/install")
+def install_url() -> dict:
+    """Where the 'Install on GitHub' button sends a customer.
+
+    Returns the public GitHub App install URL when the App is configured, so the
+    frontend can render a real install button (the self-serve entry point).
+    """
+    from app.config import get_settings
+    s = get_settings()
+    if s.github_app_slug:
+        return {"configured": True,
+                "url": f"https://github.com/apps/{s.github_app_slug}/installations/new"}
+    return {"configured": False, "url": None}
+
+
 @router.get("/stats")
 def get_stats() -> dict:
     return store.stats()
