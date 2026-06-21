@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Policy
     risk_gate_threshold: float = 7.0
+    max_autofixes: int = 3  # max one-click suggested fixes posted per PR (bounds LLM cost)
 
     # App
     database_path: str = "casara.db"

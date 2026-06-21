@@ -11,7 +11,10 @@ W_SAST, W_SCA, W_SECRETS, W_CONTEXT = 0.40, 0.25, 0.25, 0.10
 
 # Sources that contribute to the code-security (SAST) dimension. Includes the
 # LLM code agents so the dimension is still meaningful when no scanner is installed.
-CODE_SOURCES = {"semgrep", "bandit", "security-agent", "logic-agent"}
+CODE_SOURCES = {"semgrep", "bandit", "security-agent", "logic-agent", "ai-code-agent"}
+
+# Sources that contribute to the supply-chain (SCA) dimension.
+SCA_SOURCES = {"trivy", "depscan"}
 
 # File-path keywords → sensitivity factor (general 1.0, auth 1.5, crypto/payment 2.0).
 _SENSITIVE_HIGH = ("crypto", "payment", "billing", "keystore", "private_key", "secret")
@@ -37,7 +40,7 @@ def compute_risk(findings: list[Finding], changed_files: list[str]) -> tuple[flo
     code = [f for f in findings if f.source in CODE_SOURCES]
     s_sast = _clamp(max((f.cvss_estimate for f in code), default=0.0))
 
-    sca = [f for f in findings if f.source == "trivy"]
+    sca = [f for f in findings if f.source in SCA_SOURCES]
     s_sca = _clamp(max((f.cvss_estimate for f in sca), default=0.0))
 
     secrets = [f for f in findings if f.source == "gitleaks"]

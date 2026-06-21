@@ -79,6 +79,37 @@ def post_comment(repo: str, pr_number: int, body: str) -> bool:
         return r.status_code < 300
 
 
+def post_suggestion(
+    repo: str, pr_number: int, commit_id: str, path: str,
+    start_line: int, end_line: int, replacement: str, body: str,
+) -> bool:
+    """Post an inline review comment with a GitHub 'suggestion' block.
+
+    GitHub renders ```suggestion blocks with an 'Apply suggestion' button, so the PR
+    author can accept the fix in one click. Single-line vs multi-line uses different
+    fields per the GitHub review-comments API.
+    """
+    if not _enabled() or not commit_id:
+        return False
+    suggestion = "```suggestion\n" + replacement + "\n```"
+    payload: dict = {
+        "body": f"{body}\n\n{suggestion}",
+        "commit_id": commit_id,
+        "path": path,
+        "line": end_line,
+        "side": "RIGHT",
+    }
+    if end_line > start_line:
+        payload["start_line"] = start_line
+        payload["start_side"] = "RIGHT"
+    with httpx.Client(timeout=30) as c:
+        r = c.post(f"{_API}/repos/{repo}/pulls/{pr_number}/comments",
+                   headers=_headers(), json=payload)
+        if r.status_code >= 300:
+            log.warning("suggestion post failed %s: %s", r.status_code, r.text[:200])
+        return r.status_code < 300
+
+
 def set_status(repo: str, sha: str, *, gated: bool, description: str) -> bool:
     """Set a commit status used as a required check for merge gating."""
     if not _enabled() or not sha:

@@ -22,6 +22,7 @@ class Finding(BaseModel):
     fix_prompt: str = ""
     confidence: Confidence = "MEDIUM"
     verified: bool = False            # confirmed by >=2 sources (deterministic + agent)
+    ai_signal: str = ""               # why this looks AI-generated (set by the ai-code agent)
 
 
 class Review(BaseModel):

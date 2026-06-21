@@ -10,6 +10,7 @@ import shutil
 import subprocess
 
 from app.models import Finding, Severity
+from app.services import depscan
 
 log = logging.getLogger("casara.scanners")
 
@@ -102,7 +103,7 @@ def run_gitleaks(path: str) -> list[Finding]:
 def scan_directory(path: str) -> list[Finding]:
     """Run every available scanner over a checked-out repository path."""
     findings: list[Finding] = []
-    for runner in (run_semgrep, run_bandit, run_gitleaks):
+    for runner in (run_semgrep, run_bandit, run_gitleaks, depscan.scan_dependencies):
         try:
             findings.extend(runner(path))
         except Exception as e:  # noqa: BLE001 — one scanner must not break the run

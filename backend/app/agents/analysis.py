@@ -4,7 +4,12 @@ Each agent is grounded in scanner output and the diff. Without a Gemini key the
 agents return [] (the deterministic scanner findings still flow through), so the
 system remains useful keyless.
 """
-from app.agents.prompts import LOGIC_SYSTEM, SECURITY_SYSTEM, SUMMARY_SYSTEM
+from app.agents.prompts import (
+    AI_CODE_SYSTEM,
+    LOGIC_SYSTEM,
+    SECURITY_SYSTEM,
+    SUMMARY_SYSTEM,
+)
 from app.core.security import wrap_untrusted
 from app.models import Finding
 from app.services import llm
@@ -42,6 +47,7 @@ def _parse(raw: object, source: str) -> list[Finding]:
             message=str(item.get("message", "")),
             fix_prompt=str(item.get("fix_prompt", "")),
             confidence=conf if conf in _VALID_CONF else "MEDIUM",
+            ai_signal=str(item.get("ai_signal", "")),
         ))
     return out
 
@@ -60,6 +66,26 @@ def security_agent(diff: str, scanner_findings: list[Finding]) -> list[Finding]:
 
 def logic_agent(diff: str, scanner_findings: list[Finding]) -> list[Finding]:
     return _agent(LOGIC_SYSTEM, "logic-agent", diff, scanner_findings)
+
+
+def aicode_agent(
+    diff: str, scanner_findings: list[Finding], changed_files: list[str] | None = None
+) -> list[Finding]:
+    """Detect security problems characteristic of AI-generated code.
+
+    This is CASARA's differentiator. It also sees the list of changed file paths so it
+    can flag new/suspicious dependencies and poisoned AI-assistant config files.
+    """
+    files_note = (
+        "Changed files in this PR:\n" + "\n".join(f"- {p}" for p in (changed_files or []))
+        if changed_files else "(file list unavailable)"
+    )
+    prompt = (
+        f"Scanner findings (verified signals):\n{_scanner_context(scanner_findings)}\n\n"
+        f"{files_note}\n\n"
+        f"Pull-request diff:\n{wrap_untrusted(diff)}"
+    )
+    return _parse(llm.complete_json(AI_CODE_SYSTEM, prompt), "ai-code-agent")
 
 
 def summarize(findings: list[Finding], risk_score: float, gated: bool) -> str:

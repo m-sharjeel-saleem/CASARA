@@ -11,7 +11,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 
-from app.agents import analysis
+from app.agents import analysis, autofix
 from app.core import events
 from app.core.risk import compute_risk, should_gate
 from app.db import store
@@ -73,14 +73,44 @@ def _comment(review: Review, breakdown: dict, gate_reason: str) -> str:
         return head + "_No findings._"
     rows = "\n".join(
         f"| {f.severity.upper()} | `{f.file}:{f.line or '-'}` | {f.cwe_id or '-'} | "
-        f"{'✅' if f.verified else ''} | {f.message} |"
+        f"{'✅' if f.verified else ''} | {('🤖 ' + f.ai_signal) if f.ai_signal else ''} | {f.message} |"
         for f in review.findings[:30]
     )
-    table = ("| Severity | Location | CWE | Verified | Finding |\n"
-             "|---|---|---|---|---|\n" + rows)
+    table = ("| Severity | Location | CWE | Verified | AI signal | Finding |\n"
+             "|---|---|---|---|---|---|\n" + rows)
     comp = (f"\n\n<sub>Components — SAST {breakdown['S_sast']} · SCA {breakdown['S_sca']} · "
             f"Secrets {breakdown['S_secrets']} · Context {breakdown['S_context']}</sub>")
     return head + table + comp
+
+
+def _post_fixes(review: Review, max_fixes: int) -> int:
+    """Generate and post one-click suggested fixes for the top fixable findings.
+
+    Capped at `max_fixes` per PR to bound LLM cost. Returns the number posted.
+    File content is re-fetched at the PR head so suggestion line numbers line up.
+    """
+    if max_fixes <= 0:
+        return 0
+    posted = 0
+    file_cache: dict[str, str | None] = {}
+    for f in review.findings:
+        if posted >= max_fixes:
+            break
+        if not f.file or not f.line:
+            continue
+        if f.file not in file_cache:
+            file_cache[f.file] = github.fetch_file(review.repo, f.file, review.head_sha)
+        sug = autofix.generate(f, file_cache[f.file])
+        if sug is None:
+            continue
+        body = (f"🔧 **CASARA suggested fix** — {f.cwe_id or f.severity}: "
+                f"{sug.explanation or f.message}")
+        if github.post_suggestion(
+            review.repo, review.pr_number, review.head_sha, sug.file,
+            sug.start_line, sug.end_line, sug.replacement, body,
+        ):
+            posted += 1
+    return posted
 
 
 def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: str) -> Review:
@@ -102,8 +132,11 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
             _materialize(repo, files, head_sha, root)
             scanner_findings = scanners.scan_directory(root)
 
-        agent_findings = analysis.security_agent(diff, scanner_findings) + \
-            analysis.logic_agent(diff, scanner_findings)
+        agent_findings = (
+            analysis.security_agent(diff, scanner_findings)
+            + analysis.logic_agent(diff, scanner_findings)
+            + analysis.aicode_agent(diff, scanner_findings, files)
+        )
 
         review.findings = aggregate(scanner_findings + agent_findings)
         review.risk_score, breakdown = compute_risk(review.findings, files)
@@ -115,6 +148,7 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         review.completed_at = _now()
 
         github.post_comment(repo, pr_number, _comment(review, breakdown, gate_reason))
+        _post_fixes(review, get_settings().max_autofixes)
         github.set_status(
             repo, head_sha, gated=review.gated,
             description=(f"blocked — {gate_reason}" if review.gated
