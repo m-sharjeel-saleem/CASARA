@@ -1,0 +1,46 @@
+# Render blueprint for the CASARA backend. Connect this repo in the Render dashboard
+# ("New + → Blueprint") and it provisions the service. Secrets are set in the dashboard
+# (sync:false means Render prompts you; never commit real keys).
+services:
+  - type: web
+    name: casara-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MODEL_REASONING
+        value: gemini-2.5-pro
+      - key: MODEL_FAST
+        value: gemini-2.5-flash
+      # GitHub App (multi-tenant). See docs/GITHUB_APP_SETUP.md.
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_SLUG
+        sync: false
+      - key: GITHUB_APP_CLIENT_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      # Supabase (multi-tenant store). Empty → falls back to local SQLite.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      # Policy
+      - key: RISK_GATE_THRESHOLD
+        value: "7.0"
+      - key: MAX_AUTOFIXES
+        value: "3"
+      # Your Vercel frontend origin(s), comma-separated.
+      - key: CORS_ORIGINS
+        sync: false

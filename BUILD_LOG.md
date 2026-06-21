@@ -217,3 +217,66 @@ URL.
 
 **Status after Phase 2:** CASARA is now *architecturally* a multi-tenant, installable product. Next
 (Phase 3) we add real customer accounts + data isolation on Supabase, then deploy it live (Phase 5).
+
+---
+
+### Step 5 — Supabase multi-tenant store (Phase 3, data isolation)
+
+**The problem it solves:** SQLite is one file on one server — fine for a demo, impossible for charging
+many customers (no isolation, no hosted auth, no scaling). We move the data to **Supabase (Postgres)**
+with **Row-Level Security** so each customer only sees their own data — without breaking local dev.
+
+**The clever bit (so nothing breaks):** `app/db/store.py` is now a **dispatcher**. It picks the
+backend at runtime: Supabase when `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` are set, otherwise local
+SQLite. Every caller still just writes `store.save_review(...)`. Tests stay on SQLite and stay green.
+
+**Files touched:**
+- `supabase/migrations/0001_init.sql` *(new)* — the Postgres schema: `installations` (the tenant),
+  `reviews` (findings as `jsonb`), `usage_counters` (for Phase 4 billing). **RLS policies** let a
+  logged-in user *read* only rows for installations they own; all *writes* go through the backend's
+  service-role key (which bypasses RLS) — so the webhook pipeline isn't blocked but users are isolated.
+- `app/db/sqlite_store.py` *(new)* — the original SQLite code, unchanged, now a backend.
+- `app/db/supabase_store.py` *(new)* — same interface, talks to Supabase over PostgREST via httpx
+  (no heavy SDK). Supports an optional `installation_id` filter for per-tenant lists/stats.
+- `app/db/store.py` — rewritten as the runtime dispatcher.
+- `app/config.py` — added `supabase_url` / `supabase_service_key` / `supabase_anon_key` + `use_supabase`.
+
+**What you understand now:** "multi-tenant" = many customers, one app, data kept separate. We do it
+with Postgres RLS (the database enforces isolation) rather than trusting application code to filter —
+that's the safer, standard SaaS pattern.
+
+> Still TODO in Phase 3 (needs your Supabase project to test against): the **GitHub OAuth login**
+> flow and matching a logged-in user to their installations (`owner_user_id`). The schema + read
+> policies are ready; the login wiring is the remaining piece.
+
+---
+
+### Step 6 — Deploy infrastructure + landing page (Phase 5, going live)
+
+**The problem it solves:** Nothing earns money until it's *live* and a stranger can find, understand,
+and install it. So: containerize the backend, blueprint the hosting, and build a real storefront.
+
+**Files touched:**
+- `backend/Dockerfile` *(new)* — Python 3.12 image; installs deps + Semgrep + Bandit so scanners work
+  in production; runs uvicorn on Render's `$PORT`.
+- `render.yaml` *(new)* — Render blueprint: one click provisions `casara-api`, with every secret as a
+  `sync:false` env var (Render prompts you; real keys never get committed).
+- `frontend/vercel.json` *(new)* — Vercel config for the Next.js frontend.
+- `frontend/app/page.tsx` → **new marketing landing page** (the dashboard moved to
+  `frontend/app/dashboard/page.tsx`). The landing page sells the product using the **real research
+  numbers** (45% insecure AI code, 2.74× more issues in AI PRs, 28.6M secrets) and has "Install on
+  GitHub" CTAs.
+- `frontend/components/InstallButton.tsx` *(new)* — fetches the real App install URL from
+  `GET /api/install` so the button works the moment the App is configured.
+- `docs/DEPLOY.md` *(new)* — the full free-tier deploy runbook (Supabase → GitHub App → Render →
+  Vercel → verify the whole loop).
+
+**Verified:** frontend builds clean (`/` landing 11 kB, `/dashboard` works); backend 24 tests pass.
+
+**Status after Phase 5 (code):** Everything that can be built *without your accounts* is built. The
+product is live-ready: containerized backend, hosting blueprints, a selling landing page, and a
+multi-tenant data layer. What's left is **plugging in your credentials and clicking deploy** — see the
+final handoff checklist at the end of this session.
+
+> Phase 4 (Stripe billing) is intentionally last — per your decision, we validate that people install
+> and use it *before* building the paywall. The schema already has `usage_counters` + `plan` ready for it.

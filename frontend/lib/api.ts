@@ -9,6 +9,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
+  installUrl: () => get<{ configured: boolean; url: string | null }>("/api/install"),
   stats: () => get<Stats>("/api/stats"),
   reviews: () => get<Review[]>("/api/reviews"),
   review: (id: string) => get<Review>(`/api/reviews/${id}`),

@@ -36,9 +36,17 @@ class Settings(BaseSettings):
     risk_gate_threshold: float = 7.0
     max_autofixes: int = 3  # max one-click suggested fixes posted per PR (bounds LLM cost)
 
-    # App
+    # Storage. SQLite by default (local/dev). Set SUPABASE_URL + SUPABASE_SERVICE_KEY
+    # to switch the store backend to Supabase (hosted, multi-tenant) automatically.
     database_path: str = "casara.db"
+    supabase_url: str = ""
+    supabase_service_key: str = ""        # service-role key — server-side only, bypasses RLS
+    supabase_anon_key: str = ""           # public anon key — used by the frontend
     cors_origins: str = "http://localhost:3000"
+
+    @property
+    def use_supabase(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_key)
 
     @property
     def cors_origin_list(self) -> list[str]:
