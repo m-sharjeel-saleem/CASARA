@@ -10,6 +10,11 @@ def isolated_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GITHUB_TOKEN", "")
     monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
+    # Force the local SQLite backend so tests never touch a real Supabase project,
+    # even when the developer's .env has live SUPABASE_* credentials set.
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "")
+    monkeypatch.setenv("FREE_MONTHLY_REVIEWS", "0")
     get_settings.cache_clear()
     from app.db import store
     store.init_db()
