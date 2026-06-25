@@ -327,3 +327,43 @@ free, and no credit card required.
 
 Remaining to go fully live: deploy the frontend (Vercel), then connect CORS + point the GitHub App
 webhook at the HF URL and test a real PR.
+
+---
+
+### Step 9 — Competitive upgrade: custom rules, noise control, gating levels, agentic critic
+
+Driven by deep market research (see `docs/ROADMAP.md`). Closes the table-stakes gaps every
+competitor (CodeRabbit, Qodo, Semgrep) has, and adds the "advanced agentic" differentiator.
+
+**`.casara.yml` per-repo config** (`app/core/config_file.py`, example at `.casara.example.yml`):
+- Teams configure CASARA from their own repo (same pattern as CodeRabbit's `.coderabbit.yaml`).
+- Supports: `languages` (scope analysis), per-path natural-language `rules`, `severity_overrides`
+  (raise-only), `gate` level+threshold, `noise` (max_comments, min_confidence).
+- Fetched from the PR head, validated with pydantic, falls back to safe defaults if absent/malformed.
+
+**Custom per-path rules → AI agents:** matching rules' natural-language instructions are passed into
+the security/logic/ai-code agent prompts so the AI enforces *your* team's policies.
+
+**Language/framework scoping** (`_scope_by_language`): only files in the configured languages are
+analysed; config/manifest files always pass through so secret + supply-chain checks still run.
+
+**Noise control** (the #1 trust lever from the research — precision beats volume):
+- `_filter_noise` drops AI findings below `min_confidence` (scanner-verified findings always kept).
+- PR comment capped at `max_comments`, with a "+N more on the dashboard" footer.
+
+**Gating levels** `off | warning | error`: warning surfaces risk without blocking; error blocks
+(critical/verified-high still hard-gate under error); off never blocks.
+
+**Agentic upgrade — orchestrated sub-agents + grounded critic loop:**
+- The three specialized agents now run **in parallel** (ThreadPoolExecutor — they're I/O-bound LLM
+  calls), cutting latency.
+- A new **critic** (`analysis.critic`, `CRITIC_SYSTEM`) reviews the merged findings and drops/downgrades
+  likely false positives — but **only among AI-only findings**, and grounded in the diff + scanner
+  output (the research showed ungrounded reflection adds little). Scanner-verified findings are never
+  dropped. This directly attacks the false-positive problem that hurts competitors.
+
+**Tests:** +6 (config parse/defaults, glob matching, language scoping, severity overrides, noise
+filter, keyless critic) → **31 passing**. Added `PyYAML` to requirements.
+
+**Implements the user's three researched ideas:** (a) custom rules ✅, (b) advanced agentic
+architecture ✅ (scoped: parallel + grounded critic), (c) language selection ✅.

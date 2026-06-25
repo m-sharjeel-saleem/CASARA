@@ -9,6 +9,7 @@ sse-starlette==2.1.3
 httpx==0.28.1
 PyJWT==2.10.1          # sign the GitHub App JWT (RS256)
 cryptography==44.0.0   # RS256 backend for PyJWT (App private key)
+PyYAML==6.0.2          # parse the per-repo .casara.yml config
 
 # --- Dev / tests ---
 pytest==8.3.4

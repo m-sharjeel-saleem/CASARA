@@ -184,6 +184,71 @@ def test_review_persists_installation_id():
     assert got is not None and got.installation_id == 4242
 
 
+def test_config_parses_and_defaults():
+    from app.core.config_file import parse_config
+    cfg = parse_config("""
+version: 1
+languages: [python]
+gate:
+  level: warning
+  threshold: 6.0
+noise:
+  max_comments: 5
+  min_confidence: HIGH
+rules:
+  - path: "src/auth/**"
+    instructions: "Be strict about authz."
+severity_overrides:
+  CWE-89: critical
+""")
+    assert cfg.languages == ["python"]
+    assert cfg.gate.level == "warning" and cfg.gate.threshold == 6.0
+    assert cfg.noise.max_comments == 5 and cfg.noise.min_confidence == "HIGH"
+    assert cfg.severity_overrides["CWE-89"] == "critical"
+    # malformed YAML / wrong types fall back to defaults, never raise
+    assert parse_config("::: not yaml :::").gate.level == "error"
+    assert parse_config(None).languages == []
+
+
+def test_config_instructions_match_glob():
+    from app.core.config_file import parse_config
+    cfg = parse_config('rules:\n  - path: "**/*.py"\n    instructions: "No eval."')
+    assert "No eval" in cfg.instructions_for(["app/main.py"])
+    assert cfg.instructions_for(["app/main.js"]) == ""
+
+
+def test_language_scoping():
+    from app.services.review import _scope_by_language
+    files = ["a.py", "b.js", "package.json", "c.go"]
+    # python only → keep .py + unknown-extension files (configs), drop .js/.go
+    assert _scope_by_language(files, ["python"]) == ["a.py", "package.json"]
+    # empty → keep all
+    assert _scope_by_language(files, []) == files
+
+
+def test_severity_overrides_raise_only():
+    from app.services.review import _apply_overrides
+    fs = [_f(cwe_id="CWE-89", severity="medium"), _f(cwe_id="CWE-1", severity="critical")]
+    _apply_overrides(fs, {"CWE-89": "critical", "CWE-1": "low"})
+    assert fs[0].severity == "critical"   # raised
+    assert fs[1].severity == "critical"   # never lowered
+
+
+def test_noise_filter_keeps_verified():
+    from app.services.review import _filter_noise
+    fs = [_f(confidence="LOW", verified=False), _f(confidence="LOW", verified=True),
+          _f(confidence="HIGH", verified=False)]
+    kept = _filter_noise(fs, "MEDIUM")
+    assert len(kept) == 2  # drops the unverified LOW; keeps verified-LOW and HIGH
+
+
+def test_critic_keyless_keeps_all():
+    # No Gemini key → critic returns findings unchanged (graceful).
+    from app.agents.analysis import critic
+    fs = [_f(verified=False, source="security-agent")]
+    assert critic("some diff", fs) == fs
+
+
 def test_store_roundtrip():
     r = Review(id="abc123", repo="o/r", pr_number=5, status="completed",
                risk_score=4.2, findings=[_f()], created_at="2026-01-01T00:00:00Z")

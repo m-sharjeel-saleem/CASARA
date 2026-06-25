@@ -6,6 +6,7 @@ system remains useful keyless.
 """
 from app.agents.prompts import (
     AI_CODE_SYSTEM,
+    CRITIC_SYSTEM,
     LOGIC_SYSTEM,
     SECURITY_SYSTEM,
     SUMMARY_SYSTEM,
@@ -52,24 +53,36 @@ def _parse(raw: object, source: str) -> list[Finding]:
     return out
 
 
-def _agent(system: str, source: str, diff: str, scanner_findings: list[Finding]) -> list[Finding]:
+def _custom_block(custom_instructions: str) -> str:
+    if not custom_instructions:
+        return ""
+    return ("\n\nTeam-specific review rules (from .casara.yml) — prioritise these:\n"
+            f"{custom_instructions}")
+
+
+def _agent(system: str, source: str, diff: str, scanner_findings: list[Finding],
+           custom_instructions: str = "") -> list[Finding]:
     prompt = (
-        f"Scanner findings (verified signals):\n{_scanner_context(scanner_findings)}\n\n"
+        f"Scanner findings (verified signals):\n{_scanner_context(scanner_findings)}"
+        f"{_custom_block(custom_instructions)}\n\n"
         f"Pull-request diff:\n{wrap_untrusted(diff)}"
     )
     return _parse(llm.complete_json(system, prompt), source)
 
 
-def security_agent(diff: str, scanner_findings: list[Finding]) -> list[Finding]:
-    return _agent(SECURITY_SYSTEM, "security-agent", diff, scanner_findings)
+def security_agent(diff: str, scanner_findings: list[Finding],
+                   custom_instructions: str = "") -> list[Finding]:
+    return _agent(SECURITY_SYSTEM, "security-agent", diff, scanner_findings, custom_instructions)
 
 
-def logic_agent(diff: str, scanner_findings: list[Finding]) -> list[Finding]:
-    return _agent(LOGIC_SYSTEM, "logic-agent", diff, scanner_findings)
+def logic_agent(diff: str, scanner_findings: list[Finding],
+                custom_instructions: str = "") -> list[Finding]:
+    return _agent(LOGIC_SYSTEM, "logic-agent", diff, scanner_findings, custom_instructions)
 
 
 def aicode_agent(
-    diff: str, scanner_findings: list[Finding], changed_files: list[str] | None = None
+    diff: str, scanner_findings: list[Finding], changed_files: list[str] | None = None,
+    custom_instructions: str = "",
 ) -> list[Finding]:
     """Detect security problems characteristic of AI-generated code.
 
@@ -81,11 +94,51 @@ def aicode_agent(
         if changed_files else "(file list unavailable)"
     )
     prompt = (
-        f"Scanner findings (verified signals):\n{_scanner_context(scanner_findings)}\n\n"
+        f"Scanner findings (verified signals):\n{_scanner_context(scanner_findings)}"
+        f"{_custom_block(custom_instructions)}\n\n"
         f"{files_note}\n\n"
         f"Pull-request diff:\n{wrap_untrusted(diff)}"
     )
     return _parse(llm.complete_json(AI_CODE_SYSTEM, prompt), "ai-code-agent")
+
+
+_SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+
+
+def critic(diff: str, findings: list[Finding]) -> list[Finding]:
+    """Grounded critic loop: drop/downgrade likely false positives among UNVERIFIED findings.
+
+    Scanner-grounded (verified) findings are never dropped — only AI-only findings are
+    subject to the critic, and the critique is grounded in the diff + scanner output (per
+    the research: ungrounded reflection adds little). Returns the surviving findings.
+    """
+    candidates = [(i, f) for i, f in enumerate(findings) if not f.verified]
+    if not candidates:
+        return findings
+
+    listing = "\n".join(
+        f"[{i}] {f.severity} {f.cwe_id} {f.file}:{f.line} ({f.source}) — {f.message}"
+        for i, f in candidates
+    )
+    raw = llm.complete_json(
+        CRITIC_SYSTEM,
+        f"Candidate findings:\n{listing}\n\nPull-request diff:\n{wrap_untrusted(diff)}",
+    )
+    if not isinstance(raw, dict):
+        return findings  # critic unavailable (keyless) → keep everything
+
+    drop = {int(i) for i in raw.get("drop", []) if isinstance(i, int)}
+    downgrade = {int(d["index"]): str(d.get("severity", "")).lower()
+                 for d in raw.get("downgrade", []) if isinstance(d, dict) and "index" in d}
+
+    out: list[Finding] = []
+    for i, f in enumerate(findings):
+        if i in drop and not f.verified:
+            continue
+        if i in downgrade and downgrade[i] in _VALID_SEV and not f.verified:
+            f.severity = downgrade[i]  # type: ignore[assignment]
+        out.append(f)
+    return out
 
 
 def summarize(findings: list[Finding], risk_score: float, gated: bool) -> str:

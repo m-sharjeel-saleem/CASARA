@@ -1,0 +1,33 @@
+# CASARA per-repo configuration. Copy to `.casara.yml` at your repo root to customise reviews.
+# Everything is optional — omit a section to use the safe default.
+
+version: 1
+
+# Only review files in these languages (empty = all). Config/manifest files are always checked
+# so secret + supply-chain scanning still runs.
+languages: [python, javascript, typescript]
+
+# Merge gating policy.
+gate:
+  level: error          # off = never block · warning = surface but don't block · error = block
+  threshold: 7.0        # composite risk (0-10) at/above which a PR is gated
+
+# Noise control — keep signal high (precision beats volume).
+noise:
+  max_comments: 10      # max findings shown in the PR comment (rest go to the dashboard)
+  min_confidence: LOW   # drop AI findings below this confidence: LOW | MEDIUM | HIGH
+
+# Natural-language rules scoped to file globs — handed to the AI reviewers.
+rules:
+  - path: "src/auth/**"
+    instructions: "Authentication code. Be strict about session handling, password storage, and authz checks."
+    severity: high
+  - path: "**/*.py"
+    instructions: "Require parameterized SQL. Flag eval()/exec() and pickle on untrusted input."
+  - path: "infra/**"
+    instructions: "Infrastructure-as-code. Flag public ingress, wildcard IAM, and unencrypted storage."
+
+# Force a minimum severity for specific CWEs (only ever raises, never lowers).
+severity_overrides:
+  CWE-89: critical      # SQL injection
+  CWE-798: critical     # hardcoded credentials
