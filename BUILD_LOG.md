@@ -309,3 +309,21 @@ is already in place.
 
 **Status: build complete for everything that doesn't need your credentials.** See the handoff
 checklist (end of session / your chat) for the exact list of accounts and keys to plug in.
+
+---
+
+### Step 8 — Backend deployed live to Hugging Face Spaces (free, no card)
+
+We deployed the backend to **Hugging Face Spaces** (Docker SDK) instead of Render — same Dockerfile,
+free, and no credit card required.
+
+- `backend/README.md` carries the HF Space metadata (`sdk: docker`, `app_port: 8000`), which also
+  auto-converts a Gradio space to Docker on push.
+- The backend folder was pushed to the Space `sharry121/CASARA` (secrets/venv/db excluded from the
+  push — the Space repo is public, so only code goes there).
+- All secrets live in the Space's **Settings → Secrets** (set in the HF dashboard + the private key
+  added via the HF API so it never touched the chat/transcript).
+- **Live URL:** `https://sharry121-casara.hf.space` — `/health` returns ok.
+
+Remaining to go fully live: deploy the frontend (Vercel), then connect CORS + point the GitHub App
+webhook at the HF URL and test a real PR.
