@@ -1,11 +1,12 @@
 "use client";
 
-import { ShieldX } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Radar, ShieldX } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { FilterBar, type ReviewFilter } from "@/components/FilterBar";
 import { Header } from "@/components/Header";
+import { MetricsPanel } from "@/components/MetricsPanel";
 import { ReviewCard } from "@/components/ReviewCard";
-import { StatsBar } from "@/components/StatsBar";
 import { TriggerBar } from "@/components/TriggerBar";
 import { API_BASE, api } from "@/lib/api";
 import type { Review, Stats } from "@/lib/types";
@@ -14,16 +15,19 @@ export default function Dashboard() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [live, setLive] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ReviewFilter>("all");
 
   const refresh = useCallback(async () => {
     try {
       const [r, s] = await Promise.all([api.reviews(), api.stats()]);
-      setReviews(r);
-      setStats(s);
-      setErr(null);
+      setReviews(r); setStats(s); setErr(null);
     } catch {
-      setErr(`Cannot reach the CASARA API at ${API_BASE}. Is the backend running?`);
+      setErr(`Can't reach the CASARA API at ${API_BASE}. Confirm the backend is running and NEXT_PUBLIC_API_URL is set.`);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -38,38 +42,82 @@ export default function Dashboard() {
     return () => es.close();
   }, [refresh]);
 
+  const counts = useMemo(() => ({
+    all: reviews.length,
+    blocked: reviews.filter((r) => r.gated).length,
+    passed: reviews.filter((r) => !r.gated && r.status === "completed").length,
+  }), [reviews]);
+
+  const visible = useMemo(() => reviews.filter((r) => {
+    if (filter === "blocked" && !r.gated) return false;
+    if (filter === "passed" && (r.gated || r.status !== "completed")) return false;
+    const q = query.trim().toLowerCase();
+    if (q && !`${r.repo} ${r.pr_title}`.toLowerCase().includes(q)) return false;
+    return true;
+  }), [reviews, filter, query]);
+
   return (
     <>
       <Header live={live} />
-      <main className="mx-auto max-w-5xl px-5 pb-24">
-        <section className="py-10 text-center sm:py-14">
-          <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-5xl">
-            <span className="text-gradient">Automated security review</span> for every pull request
+      <main className="mx-auto max-w-7xl px-5 pb-24 pt-8">
+        <div className="mb-6">
+          <div className="eyebrow mb-1.5">Security Console</div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Pull-request <span className="text-gradient">threat radar</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            Scanner-grounded multi-agent analysis with a composite risk score and automatic merge
-            gating — delivered as inline GitHub comments and tracked here.
-          </p>
-        </section>
+        </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <TriggerBar onTriggered={refresh} />
-          <StatsBar stats={stats} />
+
+          {loading ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+              <div className="skeleton h-32 rounded-2xl lg:col-span-3" />
+              <div className="skeleton h-32 rounded-2xl lg:col-span-4" />
+              <div className="skeleton h-32 rounded-2xl lg:col-span-2" />
+              <div className="skeleton h-32 rounded-2xl lg:col-span-3" />
+              <div className="skeleton h-24 rounded-2xl lg:col-span-12" />
+            </div>
+          ) : (
+            <MetricsPanel stats={stats} reviews={reviews} />
+          )}
 
           {err && (
-            <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-              <ShieldX className="h-4 w-4" /> {err}
+            <div className="flex items-start gap-2 rounded-xl border border-sev-critical/30 bg-sev-critical/10 px-4 py-3 text-sm text-sev-critical">
+              <ShieldX className="mt-0.5 h-4 w-4 shrink-0" /> {err}
             </div>
           )}
 
-          <div className="space-y-3 pt-2">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Recent Reviews</h2>
-            {reviews.length === 0 && !err ? (
-              <div className="glass rounded-2xl py-12 text-center text-sm text-zinc-500">
-                No reviews yet. Trigger one above, or open a PR on a connected repository.
+          <div className="pt-2">
+            <div className="mb-3 flex items-center gap-2">
+              <Radar className="h-4 w-4 text-accent-soft" />
+              <h2 className="eyebrow">Live review feed</h2>
+            </div>
+
+            {!loading && reviews.length > 0 && (
+              <div className="mb-4">
+                <FilterBar query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} counts={counts} />
               </div>
+            )}
+
+            {loading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+              </div>
+            ) : reviews.length === 0 && !err ? (
+              <div className="panel rounded-2xl py-16 text-center">
+                <Radar className="mx-auto h-8 w-8 text-slate-600" />
+                <p className="mt-3 text-sm text-slate-400">No reviews yet.</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Run a review above, or open a pull request on a connected repository.
+                </p>
+              </div>
+            ) : visible.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-500">No reviews match your filter.</p>
             ) : (
-              reviews.map((r) => <ReviewCard key={r.id} review={r} />)
+              <div className="space-y-3">
+                {visible.map((r, i) => <ReviewCard key={r.id} review={r} index={i} />)}
+              </div>
             )}
           </div>
         </div>

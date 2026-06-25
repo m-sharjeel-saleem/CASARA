@@ -25,7 +25,7 @@ export function InstallButton({ size = "lg" }: { size?: "lg" | "sm" }) {
   return (
     <a
       href={url}
-      className={`inline-flex items-center gap-2 rounded-xl bg-white font-semibold text-black transition hover:bg-zinc-200 ${cls}`}
+      className={`inline-flex items-center gap-2 rounded-xl bg-accent font-semibold text-white shadow-glow transition hover:bg-accent-deep ${cls}`}
     >
       <Github className="h-4 w-4" />
       Install on GitHub

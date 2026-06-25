@@ -3,25 +3,85 @@
 @tailwind utilities;
 
 :root { color-scheme: dark; }
-html, body { background-color: #070b12; color: #e6edf5; -webkit-font-smoothing: antialiased; }
+html, body {
+  background-color: #090c14;
+  color: #e8edf6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
 
-.bg-mesh {
+/* ── Ambient: layered radar field for the "scanner" identity ───────────── */
+.bg-field {
   background:
-    radial-gradient(55% 45% at 12% 0%, rgba(34, 211, 238, 0.14), transparent 70%),
-    radial-gradient(45% 45% at 95% 5%, rgba(52, 211, 153, 0.08), transparent 70%);
+    radial-gradient(60% 50% at 15% -5%, rgba(109,123,255,0.16), transparent 70%),
+    radial-gradient(45% 45% at 100% 0%, rgba(62,224,163,0.07), transparent 70%),
+    radial-gradient(50% 60% at 50% 120%, rgba(109,123,255,0.06), transparent 70%);
 }
 .bg-grid {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image:
+    linear-gradient(rgba(148,163,184,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(80% 60% at 50% 0%, #000 30%, transparent 100%);
 }
+/* Slowly rotating conic "radar sweep" used behind the hero / gauges. */
+.radar-sweep::before {
+  content: "";
+  position: absolute; inset: -40%;
+  background: conic-gradient(from 0deg, transparent 0 78%, rgba(109,123,255,0.18) 92%, transparent 100%);
+  animation: sweep 8s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Surfaces ──────────────────────────────────────────────────────────── */
 .glass {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
-  border: 1px solid rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012));
+  border: 1px solid rgba(148,163,184,0.12);
+  backdrop-filter: blur(14px);
 }
+.panel {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)),
+    #0e1320;
+  border: 1px solid rgba(148,163,184,0.12);
+}
+.hairline { border-color: rgba(148,163,184,0.12); }
+
+/* ── Type accents ──────────────────────────────────────────────────────── */
 .text-gradient {
-  background: linear-gradient(120deg, #fff 10%, #67e8f9 60%, #34d399 100%);
+  background: linear-gradient(110deg, #fff 8%, #a5b0ff 55%, #6d7bff 100%);
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase; letter-spacing: 0.22em; font-size: 11px;
+  color: #7c8aa3;
+}
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Skeleton shimmer for loading states. */
+.skeleton {
+  background: linear-gradient(90deg, rgba(148,163,184,0.06) 25%, rgba(148,163,184,0.14) 37%, rgba(148,163,184,0.06) 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* Severity left-stripe on cards. */
+.stripe-critical { box-shadow: inset 3px 0 0 0 #ff4d6d; }
+.stripe-high { box-shadow: inset 3px 0 0 0 #ff8a3d; }
+.stripe-medium { box-shadow: inset 3px 0 0 0 #f5c043; }
+.stripe-low { box-shadow: inset 3px 0 0 0 #7c8aa3; }
+.stripe-safe { box-shadow: inset 3px 0 0 0 #3ee0a3; }
+
+/* Focus ring for keyboard users. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid #6d7bff; outline-offset: 2px; border-radius: 6px;
+}
+
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.3); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+}

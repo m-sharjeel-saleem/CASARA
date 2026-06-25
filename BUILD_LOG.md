@@ -386,3 +386,35 @@ a second `--config`, so teams get engine-enforced AST rules on top of the natura
 
 **Deploy model recorded:** backend → push to the HF Space (Docker rebuild). Frontend → push to GitHub
 `origin/main`, which Vercel auto-builds. Both done this step.
+
+---
+
+### Step 11 — Frontend redesign: "Operations Console / Threat Radar"
+
+A full UI overhaul to an advanced, futuristic identity — **every widget backed by a real endpoint**
+(no fake data). Followed a deliberate design plan, deliberately moving off the old cyan→emerald
+gradient (a common AI look).
+
+**Design system** (`tailwind.config.ts`, `app/globals.css`, `app/layout.tsx`):
+- Palette: `ink #090c14` ground, `panel #141b2b` surface, **iris `#6d7bff`** brand accent (distinct
+  from every status colour), and a separate **severity scale** (critical/high/medium/low/info) that
+  encodes state in colour.
+- Type: **Sora** (display) + **Inter** (UI) + **JetBrains Mono** (all data/metrics, tabular-nums) —
+  three deliberate roles. Self-hosted via `next/font` (no CDN).
+- Ambient: layered radar field + grid mask + a conic **radar-sweep** motion, all behind
+  `prefers-reduced-motion`. Glass/panel surfaces, glow + tile shadows, skeleton shimmer, severity
+  left-stripes, visible focus rings.
+
+**Information design** (instrument primitives, `components/charts.tsx`):
+- `RiskGauge` — SVG arc gauge for average risk (colour by level).
+- `Sparkline` — risk trend across recent reviews (area + emphasised endpoint).
+- `SeverityBar` — stacked threat-distribution bar with legend.
+- All computed from the **real** `/api/reviews` + `/api/stats` data.
+
+**Rebuilt components/pages:** `Header` (live SSE pulse + install), `MetricsPanel` (instrument tiles),
+`ReviewCard` (severity-striped signal cards, findings grouped by severity, AI-signal chips, confidence,
+fix preview), `FilterBar` (client-side search + blocked/passed tabs), `TriggerBar` (restyled),
+`dashboard` (command-center layout + loading skeletons + empty states), `page` (radar-sweep hero with
+the verified research stats). Removed the old flat `StatsBar`.
+
+**Verified:** `next build` clean (`/` + `/dashboard`). Deployed via GitHub → Vercel.
