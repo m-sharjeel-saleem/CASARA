@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BadgeCheck, ChevronDown, GitPullRequest, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bot, ChevronDown, GitPullRequest, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -29,6 +29,14 @@ function FindingRow({ f }: { f: Finding }) {
         {f.verified && (
           <span className="inline-flex items-center gap-1 text-[11px] text-safe">
             <BadgeCheck className="h-3.5 w-3.5" /> verified
+          </span>
+        )}
+        {!f.verified && (
+          <span className="text-[11px] text-zinc-600">{f.confidence.toLowerCase()} confidence</span>
+        )}
+        {f.ai_signal && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[11px] text-accent-soft">
+            <Bot className="h-3 w-3" /> {f.ai_signal}
           </span>
         )}
       </div>

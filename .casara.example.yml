@@ -31,3 +31,8 @@ rules:
 severity_overrides:
   CWE-89: critical      # SQL injection
   CWE-798: critical     # hardcoded credentials
+
+# Extra declarative Semgrep rules (AST-based), enforced by the engine in addition to defaults.
+# Use a registry pack (starts with "p/") or a repo-relative rules dir/file.
+# semgrep_config: "p/owasp-top-ten"
+# semgrep_config: "ci/semgrep-rules/"

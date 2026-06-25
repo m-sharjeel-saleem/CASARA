@@ -11,12 +11,14 @@ export interface Finding {
   fix_prompt: string;
   confidence: "LOW" | "MEDIUM" | "HIGH";
   verified: boolean;
+  ai_signal: string;
 }
 
 export interface Review {
   id: string;
   repo: string;
   pr_number: number;
+  installation_id: number | null;
   pr_title: string;
   author: string;
   head_sha: string;

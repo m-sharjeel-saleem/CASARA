@@ -61,6 +61,9 @@ class CasaraConfig(BaseModel):
     gate: GateCfg = Field(default_factory=GateCfg)
     noise: NoiseCfg = Field(default_factory=NoiseCfg)
     severity_overrides: dict[str, Severity] = Field(default_factory=dict)
+    # Extra Semgrep ruleset to enforce, e.g. a registry pack ("p/owasp-top-ten") or a
+    # repo-relative rules dir/file ("ci/semgrep-rules/"). Declarative AST rules, engine-enforced.
+    semgrep_config: str = ""
 
     def instructions_for(self, files: list[str]) -> str:
         """Concatenated natural-language rules whose glob matches any changed file."""

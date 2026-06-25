@@ -197,7 +197,7 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         scanner_findings: list[Finding] = []
         with tempfile.TemporaryDirectory() as root:
             _materialize(repo, files, head_sha, root, installation_id)
-            scanner_findings = scanners.scan_directory(root)
+            scanner_findings = scanners.scan_directory(root, cfg.semgrep_config)
 
         # Orchestrated sub-agents: specialized reviewers run in parallel (I/O-bound LLM calls).
         with ThreadPoolExecutor(max_workers=3) as ex:

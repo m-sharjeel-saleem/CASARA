@@ -367,3 +367,22 @@ filter, keyless critic) → **31 passing**. Added `PyYAML` to requirements.
 
 **Implements the user's three researched ideas:** (a) custom rules ✅, (b) advanced agentic
 architecture ✅ (scoped: parallel + grounded critic), (c) language selection ✅.
+
+---
+
+### Step 10 — Tier 2 + full-stack alignment
+
+**Declarative custom Semgrep rules (Tier 2 #5):** `.casara.yml` now supports `semgrep_config` — a
+registry pack (`p/owasp-top-ten`) or a repo-relative rules dir/file. `scanners.run_semgrep` adds it as
+a second `--config`, so teams get engine-enforced AST rules on top of the natural-language rules.
+
+**Frontend ↔ backend alignment:** the dashboard now reflects every backend field:
+- `lib/types.ts`: added `ai_signal` to `Finding` and `installation_id` to `Review`.
+- `ReviewCard`: each finding now shows the 🤖 **AI signal** badge (why it looks AI-generated), a
+  **confidence** indicator for unverified findings, and the existing verified badge — so the UI tells
+  the full story the engine produces.
+
+**Verified:** 32 backend tests pass; frontend builds clean (`/` + `/dashboard`).
+
+**Deploy model recorded:** backend → push to the HF Space (Docker rebuild). Frontend → push to GitHub
+`origin/main`, which Vercel auto-builds. Both done this step.

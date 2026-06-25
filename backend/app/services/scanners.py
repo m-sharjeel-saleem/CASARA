@@ -6,6 +6,7 @@ the shared Finding model.
 """
 import json
 import logging
+import os
 import shutil
 import subprocess
 
@@ -38,10 +39,16 @@ def _run(cmd: list[str], cwd: str, timeout: int = 120) -> str | None:
         return None
 
 
-def run_semgrep(path: str) -> list[Finding]:
+def run_semgrep(path: str, extra_config: str = "") -> list[Finding]:
     if not _available("semgrep"):
         return []
-    out = _run(["semgrep", "--config", "auto", "--json", "--quiet", path], path)
+    cmd = ["semgrep", "--config", "auto"]
+    if extra_config:
+        # User-supplied registry pack or repo-relative rules (declarative AST rules).
+        ref = extra_config if extra_config.startswith("p/") else os.path.join(path, extra_config)
+        cmd += ["--config", ref]
+    cmd += ["--json", "--quiet", path]
+    out = _run(cmd, path)
     if not out:
         return []
     findings: list[Finding] = []
@@ -100,12 +107,19 @@ def run_gitleaks(path: str) -> list[Finding]:
     ) for l in (leaks or [])]
 
 
-def scan_directory(path: str) -> list[Finding]:
-    """Run every available scanner over a checked-out repository path."""
+def scan_directory(path: str, semgrep_config: str = "") -> list[Finding]:
+    """Run every available scanner over a checked-out repository path.
+
+    `semgrep_config` (from .casara.yml) adds a user-supplied declarative ruleset."""
     findings: list[Finding] = []
-    for runner in (run_semgrep, run_bandit, run_gitleaks, depscan.scan_dependencies):
+    runners = [
+        lambda p: run_semgrep(p, semgrep_config),
+        run_bandit, run_gitleaks, depscan.scan_dependencies,
+    ]
+    for runner in runners:
         try:
             findings.extend(runner(path))
         except Exception as e:  # noqa: BLE001 — one scanner must not break the run
-            log.warning("scanner error in %s: %s", runner.__name__, e)
+            name = getattr(runner, "__name__", "semgrep")
+            log.warning("scanner error in %s: %s", name, e)
     return findings

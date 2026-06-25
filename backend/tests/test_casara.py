@@ -242,6 +242,13 @@ def test_noise_filter_keeps_verified():
     assert len(kept) == 2  # drops the unverified LOW; keeps verified-LOW and HIGH
 
 
+def test_config_semgrep_passthrough():
+    from app.core.config_file import parse_config
+    cfg = parse_config('semgrep_config: "p/owasp-top-ten"')
+    assert cfg.semgrep_config == "p/owasp-top-ten"
+    assert parse_config("version: 1").semgrep_config == ""  # default empty
+
+
 def test_critic_keyless_keeps_all():
     # No Gemini key → critic returns findings unchanged (graceful).
     from app.agents.analysis import critic
