@@ -83,6 +83,14 @@ def test_aicode_agent_in_code_sources():
     assert breakdown["S_sast"] == 7.5
 
 
+def test_parse_unwraps_groq_object():
+    # Groq json_object mode wraps the array in an object — parser must unwrap it.
+    findings = _parse(
+        {"findings": [{"message": "x", "severity": "high", "cwe_id": "CWE-89"}]}, "security-agent")
+    assert len(findings) == 1 and findings[0].cwe_id == "CWE-89"
+    assert _parse({}, "security-agent") == []  # empty object → no findings
+
+
 def test_parse_captures_ai_signal():
     findings = _parse(
         [{"message": "string-built SQL", "severity": "high", "cwe_id": "CWE-89",

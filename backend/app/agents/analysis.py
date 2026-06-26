@@ -30,6 +30,10 @@ def _scanner_context(findings: list[Finding]) -> str:
 
 
 def _parse(raw: object, source: str) -> list[Finding]:
+    # Gemini (json mime) returns a bare array; Groq (json_object mode) wraps it in an
+    # object like {"findings": [...]}. Accept both by unwrapping the first list value.
+    if isinstance(raw, dict):
+        raw = next((v for v in raw.values() if isinstance(v, list)), [])
     if not isinstance(raw, list):
         return []
     out: list[Finding] = []
