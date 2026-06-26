@@ -11,8 +11,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     model_reasoning: str = "gemini-2.5-pro"
     model_fast: str = "gemini-2.5-flash"
-    # Min seconds between Gemini calls (free-tier pacing). 0 disables. ~6.5s ≈ under 10 RPM.
-    gemini_min_interval_s: float = 6.5
+    # Min seconds between Gemini calls (free-tier pacing). 0 disables. ~4s ≈ under 15 RPM.
+    gemini_min_interval_s: float = 4.0
+    # Cap the diff sent to the LLM so large PRs stay fast and under token-per-minute limits.
+    max_diff_chars: int = 12000
 
     # GitHub App (multi-tenant, installable). Falls back to PAT mode if unset.
     github_app_id: str = ""
@@ -36,7 +38,7 @@ class Settings(BaseSettings):
 
     # Policy
     risk_gate_threshold: float = 7.0
-    max_autofixes: int = 3  # max one-click suggested fixes posted per PR (bounds LLM cost)
+    max_autofixes: int = 2  # max one-click suggested fixes posted per PR (bounds LLM cost)
 
     # Billing: free-tier monthly review cap per installation. 0 = unlimited (no cap enforced).
     free_monthly_reviews: int = 0

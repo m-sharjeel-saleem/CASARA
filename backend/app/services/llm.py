@@ -14,7 +14,7 @@ from app.config import get_settings
 
 _BASE = "https://generativelanguage.googleapis.com/v1beta"
 _RETRY_STATUS = {429, 500, 502, 503, 504}
-_MAX_ATTEMPTS = 5
+_MAX_ATTEMPTS = 3
 
 # Process-wide pacing. The free Gemini tier limits requests-per-minute; the review
 # pipeline fires several calls (agents in parallel + critic + summary + fixes), so we
@@ -61,8 +61,8 @@ def _request(path: str, key: str, body: dict) -> dict:
         except (httpx.TransportError, httpx.HTTPStatusError) as e:
             last = e
         if attempt < _MAX_ATTEMPTS - 1:
-            # Free-tier quotas reset per minute, so back off meaningfully on 429.
-            time.sleep(min(30.0, 5.0 * (attempt + 1)))
+            # Back off on 429 but fail fast enough not to hang the whole review.
+            time.sleep(min(12.0, 4.0 * (attempt + 1)))
     raise RuntimeError(f"Gemini request failed after {_MAX_ATTEMPTS} attempts: {last}")
 
 

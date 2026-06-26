@@ -200,6 +200,9 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         files = github.changed_files(repo, pr_number, installation_id)
         files = _scope_by_language(files, cfg.languages)
         diff = github.get_diff(repo, pr_number, installation_id)
+        max_diff = get_settings().max_diff_chars
+        if max_diff and len(diff) > max_diff:
+            diff = diff[:max_diff] + "\n…[diff truncated for length — review focuses on the above]"
         instructions = cfg.instructions_for(files)
 
         scanner_findings: list[Finding] = []
