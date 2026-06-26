@@ -22,6 +22,15 @@ _MAX_ATTEMPTS = 3
 # orchestrator is preserved — threads just queue here.
 _pace_lock = threading.Lock()
 _last_call = [0.0]
+_degraded = [0]  # count of calls that failed (quota/transient) since the last reset
+
+
+def reset_degraded() -> None:
+    _degraded[0] = 0
+
+
+def degraded_count() -> int:
+    return _degraded[0]
 
 
 @dataclass
@@ -92,6 +101,7 @@ def complete_json(system: str, prompt: str, *, model: str | None = None) -> obje
         # Quota/transient failure must NOT fail the whole review — the AI layer is
         # additive. Degrade to no AI findings; deterministic scanners still produce a review.
         import logging
+        _degraded[0] += 1
         logging.getLogger("casara.llm").warning("LLM call degraded (no AI findings): %s", e)
         return None
     try:

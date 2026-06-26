@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from app.agents import analysis, autofix
 from app.core import events
+from app.services import llm
 from app.core.config_file import CasaraConfig, load_config
 from app.core.risk import compute_risk, should_gate
 from app.db import store
@@ -198,6 +199,7 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
     try:
         import time as _t
         t0 = _t.monotonic()
+        llm.reset_degraded()
         cfg: CasaraConfig = load_config(repo, head_sha, installation_id)
         files = github.changed_files(repo, pr_number, installation_id)
         files = _scope_by_language(files, cfg.languages)
@@ -251,6 +253,10 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
             review.gated = gated
 
         review.summary = analysis.summarize(review.findings, review.risk_score, review.gated)
+        if llm.degraded_count() and get_settings().gemini_keys:
+            review.summary += ("\n\n> ⚠️ AI analysis was rate-limited (Gemini quota) on this run, so "
+                               "this review reflects deterministic scanners only. Re-run when quota "
+                               "resets, or add API quota, for full AI-code analysis.")
         review.status = "completed"
         review.completed_at = _now()
 
