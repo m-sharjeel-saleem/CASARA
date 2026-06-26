@@ -7,6 +7,7 @@ from app.config import get_settings
 @pytest.fixture(autouse=True)
 def isolated_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "")
+    monkeypatch.setenv("GEMINI_2", "")
     monkeypatch.setenv("GITHUB_TOKEN", "")
     monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
