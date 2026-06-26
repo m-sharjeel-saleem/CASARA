@@ -443,5 +443,25 @@ A long investigation against the live deployment uncovered and fixed a cascade o
 
 **Proven working:** a clean run reviewed PR #8 end-to-end; locally (with quota available) it found two
 real **critical** issues — `CWE-798` (secret export) and `CWE-532` (token logging) — after the critic
-cut 25 raw findings to 2. The only residual limitation is Gemini free daily quota (resets daily / lift
-with billing); everything in code is complete and robust.
+cut 25 raw findings to 2.
+
+---
+
+### Step 13 — Multi-provider LLM fallback (resilient to quota exhaustion)
+
+To stop free-tier quota from ever stopping reviews, the LLM client became an **ordered backend chain**
+tried until one returns valid JSON:
+
+  `GEMINI_API_KEY` → `GEMINI_2` → `GEMINI_API_KEY_3` → **Groq** (`GROQ_API_KEY_1`,
+  `llama-3.3-70b-versatile`, OpenAI-compatible, separate quota pool).
+
+- **429 quota** on a backend → advance immediately to the next (no wasted retries).
+- **Transient 5xx/network** → brief retry on the same backend, then advance.
+- **Malformed / non-JSON** → advance.
+- **All exhausted** → return None (AI is additive; scanners still run) + a transparency note.
+- **Per-provider pacing** (Gemini slow, Groq fast); explicit model override applies to Gemini only.
+- Groq's JSON mode returns an object; `_parse` unwraps `{...: [...]}` so Groq findings aren't dropped.
+
+**Proven on the live deployment:** with all 3 Gemini keys exhausted/503, the chain fell through to
+Groq and completed PR #8 with **24 findings, risk 3.25** — e.g. `CWE-200` (keychain export as
+plaintext). The product now keeps working through quota exhaustion. Tests 32 → 35.
