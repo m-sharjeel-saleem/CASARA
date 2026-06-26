@@ -418,3 +418,30 @@ fix preview), `FilterBar` (client-side search + blocked/passed tabs), `TriggerBa
 the verified research stats). Removed the old flat `StatsBar`.
 
 **Verified:** `next build` clean (`/` + `/dashboard`). Deployed via GitHub → Vercel.
+
+---
+
+### Step 12 — Production hardening (deep debug of "reviews don't appear")
+
+A long investigation against the live deployment uncovered and fixed a cascade of real issues:
+
+1. **FK constraint silently dropped every review.** `reviews.installation_id` references
+   `installations.id`; the install webhook that registers a tenant had never reached the live backend,
+   so every review insert 409'd — and the old code swallowed the error. Fix: `run_review` upserts the
+   installation row first (self-heal); `save_review` now raises instead of swallowing.
+2. **Manual trigger couldn't reach private/selected repos.** Added `gh_app.installation_for_repo()` so
+   the trigger uses the App's installation token (the thing that grants repo access); the endpoint also
+   accepts a pasted PR URL.
+3. **`_to_review` crashed on NULL columns** (500 on read) — coerce nulls to defaults.
+4. **Free-tier Gemini quota failed whole reviews.** Root cause (from logs): `gemini-2.5-flash` free
+   tier ≈ 20 requests/day, exhausted by testing. Fixes: switched default to `gemini-2.5-flash-lite`
+   (higher quota, cheaper, faster); **disabled "thinking"** (`thinkingBudget:0`, ~5× faster calls);
+   **multi-key rotation** (`GEMINI_2` used when the first key 429s); process-wide pacing; and
+   **graceful degradation** — a quota failure no longer fails the review, the AI layer is additive and
+   deterministic scanners still produce a result. A transparency note is added when AI was rate-limited.
+5. **Stale "running" rows** came from HF free-Space restarts killing in-flight tasks during redeploys.
+
+**Proven working:** a clean run reviewed PR #8 end-to-end; locally (with quota available) it found two
+real **critical** issues — `CWE-798` (secret export) and `CWE-532` (token logging) — after the critic
+cut 25 raw findings to 2. The only residual limitation is Gemini free daily quota (resets daily / lift
+with billing); everything in code is complete and robust.
