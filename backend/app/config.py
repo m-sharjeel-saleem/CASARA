@@ -9,8 +9,16 @@ class Settings(BaseSettings):
 
     # LLM
     gemini_api_key: str = ""
+    gemini_2: str = ""          # optional 2nd key (env GEMINI_2) — used when the 1st hits quota
     model_reasoning: str = "gemini-2.5-pro"
-    model_fast: str = "gemini-2.5-flash"
+    # flash-lite: cheapest + highest free-tier quota + fastest. Best fit for a multi-call pipeline.
+    model_fast: str = "gemini-2.5-flash-lite"
+
+    @property
+    def gemini_keys(self) -> list[str]:
+        """All usable Gemini keys, in priority order (rotate on quota errors)."""
+        return [k for k in (self.gemini_api_key, self.gemini_2)
+                if k and not k.startswith("AIzaSyxxxx")]
     # Min seconds between Gemini calls (free-tier pacing). 0 disables. ~4s ≈ under 15 RPM.
     gemini_min_interval_s: float = 4.0
     # Cap the diff sent to the LLM so large PRs stay fast and under token-per-minute limits.
