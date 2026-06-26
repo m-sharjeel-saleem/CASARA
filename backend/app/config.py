@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     model_reasoning: str = "gemini-2.5-pro"
     model_fast: str = "gemini-2.5-flash"
+    # Min seconds between Gemini calls (free-tier pacing). 0 disables. ~6.5s ≈ under 10 RPM.
+    gemini_min_interval_s: float = 6.5
 
     # GitHub App (multi-tenant, installable). Falls back to PAT mode if unset.
     github_app_id: str = ""

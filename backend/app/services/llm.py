@@ -4,6 +4,7 @@ Degrades gracefully: with no GEMINI_API_KEY, returns a stub so the pipeline runs
 keyless. Key is sent as a header (never in the URL) and transient errors retry.
 """
 import json
+import threading
 import time
 from dataclasses import dataclass
 
@@ -13,7 +14,14 @@ from app.config import get_settings
 
 _BASE = "https://generativelanguage.googleapis.com/v1beta"
 _RETRY_STATUS = {429, 500, 502, 503, 504}
-_MAX_ATTEMPTS = 4
+_MAX_ATTEMPTS = 5
+
+# Process-wide pacing. The free Gemini tier limits requests-per-minute; the review
+# pipeline fires several calls (agents in parallel + critic + summary + fixes), so we
+# serialize them through a minimum interval to stay under the cap. Concurrency for the
+# orchestrator is preserved — threads just queue here.
+_pace_lock = threading.Lock()
+_last_call = [0.0]
 
 
 @dataclass
@@ -27,10 +35,22 @@ def _key() -> str | None:
     return k if k and not k.startswith("AIzaSyxxxx") else None
 
 
+def _throttle(interval: float) -> None:
+    if interval <= 0:
+        return
+    with _pace_lock:
+        wait = interval - (time.monotonic() - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+        _last_call[0] = time.monotonic()
+
+
 def _request(path: str, key: str, body: dict) -> dict:
     headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
+    interval = get_settings().gemini_min_interval_s
     last: Exception | None = None
     for attempt in range(_MAX_ATTEMPTS):
+        _throttle(interval)
         try:
             r = httpx.post(f"{_BASE}/{path}", headers=headers, json=body, timeout=90)
             if r.status_code in _RETRY_STATUS:
@@ -41,7 +61,8 @@ def _request(path: str, key: str, body: dict) -> dict:
         except (httpx.TransportError, httpx.HTTPStatusError) as e:
             last = e
         if attempt < _MAX_ATTEMPTS - 1:
-            time.sleep(1.5 ** attempt)
+            # Free-tier quotas reset per minute, so back off meaningfully on 429.
+            time.sleep(min(30.0, 5.0 * (attempt + 1)))
     raise RuntimeError(f"Gemini request failed after {_MAX_ATTEMPTS} attempts: {last}")
 
 
