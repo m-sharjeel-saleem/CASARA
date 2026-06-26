@@ -65,6 +65,32 @@ def installation_token(installation_id: int) -> str | None:
     return token
 
 
+def installation_for_repo(repo: str) -> int | None:
+    """Return the installation id of this App on `repo` (owner/name), or None.
+
+    This is what lets the manual 'Run review' trigger work on private repos: if the
+    App is installed there, GitHub returns the installation whose token grants access.
+    """
+    if not get_settings().github_app_enabled:
+        return None
+    try:
+        with httpx.Client(timeout=30) as c:
+            r = c.get(
+                f"{_API}/repos/{repo}/installation",
+                headers={
+                    "Authorization": f"Bearer {_app_jwt()}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+            if r.status_code == 200:
+                return r.json().get("id")
+            log.info("no installation for %s (HTTP %s)", repo, r.status_code)
+    except (httpx.HTTPError, ValueError) as e:
+        log.warning("installation_for_repo failed for %s: %s", repo, e)
+    return None
+
+
 def list_installations() -> list[dict]:
     """All installations of this App (used to map installs to tenants)."""
     if not get_settings().github_app_enabled:

@@ -5,9 +5,11 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+import re
+
 from app.core import events
 from app.db import store
-from app.services import github
+from app.services import gh_app, github
 from app.services.review import run_review
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -47,24 +49,47 @@ def get_review(review_id: str) -> dict:
 
 
 class RunRequest(BaseModel):
-    repo: str = Field(..., examples=["owner/name"])
-    pr_number: int = Field(..., examples=[1])
+    repo: str = Field(..., examples=["owner/name", "https://github.com/owner/name/pull/8"])
+    pr_number: int | None = Field(None, examples=[8])
+
+
+_PR_URL = re.compile(r"github\.com/([^/]+/[^/]+)/pull/(\d+)")
+
+
+def _normalize(repo: str, pr_number: int | None) -> tuple[str, int]:
+    """Accept either (owner/repo, pr_number) or a full PR URL pasted into `repo`."""
+    m = _PR_URL.search(repo)
+    if m:
+        return m.group(1), int(m.group(2))
+    repo = repo.strip().removeprefix("https://github.com/").removeprefix("github.com/").strip("/")
+    if pr_number is None:
+        raise HTTPException(status_code=422, detail="Provide a PR number, or paste the full PR URL.")
+    return repo, pr_number
 
 
 @router.post("/review/run")
 def trigger_review(req: RunRequest, background: BackgroundTasks) -> dict:
-    """Manually trigger a review for a PR (useful without webhooks)."""
+    """Manually trigger a review for a PR (useful without webhooks).
+
+    Resolves the GitHub App installation for the repo so it works on private repos
+    the App is installed on; falls back to PAT/none otherwise.
+    """
+    repo, pr_number = _normalize(req.repo, req.pr_number)
+    installation_id = gh_app.installation_for_repo(repo)
     try:
-        pr = github.get_pr(req.repo, req.pr_number)
+        pr = github.get_pr(repo, pr_number, installation_id)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"cannot fetch PR: {e}") from e
+        hint = (" — make sure CASARA is installed on this repo (Install on GitHub)."
+                if installation_id is None else "")
+        raise HTTPException(status_code=400, detail=f"cannot fetch PR: {e}{hint}") from e
     background.add_task(
         run_review,
-        repo=req.repo, pr_number=req.pr_number, pr_title=pr.get("title", ""),
+        repo=repo, pr_number=pr_number, pr_title=pr.get("title", ""),
         author=pr.get("user", {}).get("login", ""),
         head_sha=pr.get("head", {}).get("sha", ""),
+        installation_id=installation_id,
     )
-    return {"status": "accepted", "repo": req.repo, "pr": req.pr_number}
+    return {"status": "accepted", "repo": repo, "pr": pr_number}
 
 
 @router.get("/events")

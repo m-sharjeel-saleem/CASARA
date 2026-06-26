@@ -13,11 +13,11 @@ export const api = {
   stats: () => get<Stats>("/api/stats"),
   reviews: () => get<Review[]>("/api/reviews"),
   review: (id: string) => get<Review>(`/api/reviews/${id}`),
-  triggerReview: async (repo: string, prNumber: number) => {
+  triggerReview: async (repo: string, prNumber?: number) => {
     const res = await fetch(`${API_BASE}/api/review/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo, pr_number: prNumber }),
+      body: JSON.stringify({ repo, pr_number: prNumber ?? null }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => null);

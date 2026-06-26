@@ -14,11 +14,17 @@ export function TriggerBar({ onTriggered }: { onTriggered: () => void }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!repo.trim() || !pr.trim()) return;
+    if (!repo.trim()) return;
+    const looksLikeUrl = /github\.com\/.+\/pull\/\d+/.test(repo);
+    if (!looksLikeUrl && !pr.trim()) {
+      setError("Enter a PR number, or paste the full PR URL into the first box.");
+      return;
+    }
     setBusy(true); setError(null); setOk(false);
     try {
-      await api.triggerReview(repo.trim(), parseInt(pr, 10));
+      await api.triggerReview(repo.trim(), pr.trim() ? parseInt(pr, 10) : undefined);
       setOk(true);
+      setRepo(""); setPr("");
       setTimeout(onTriggered, 1500);
       setTimeout(() => setOk(false), 4000);
     } catch (e) {
@@ -35,7 +41,7 @@ export function TriggerBar({ onTriggered }: { onTriggered: () => void }) {
         <span className="eyebrow !text-[10px] hidden sm:block">Scan a PR</span>
       </div>
       <input
-        value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="owner/repo"
+        value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="owner/repo  ·  or paste a PR URL"
         className="h-10 flex-1 rounded-lg border border-border bg-black/30 px-3 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-accent/40"
       />
       <input
