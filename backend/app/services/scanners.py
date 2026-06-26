@@ -47,8 +47,9 @@ def run_semgrep(path: str, extra_config: str = "") -> list[Finding]:
         # User-supplied registry pack or repo-relative rules (declarative AST rules).
         ref = extra_config if extra_config.startswith("p/") else os.path.join(path, extra_config)
         cmd += ["--config", ref]
-    cmd += ["--json", "--quiet", path]
-    out = _run(cmd, path)
+    # Bound runtime so a slow registry fetch / huge file can't stall the review.
+    cmd += ["--timeout", "20", "--max-target-bytes", "1000000", "--json", "--quiet", path]
+    out = _run(cmd, path, timeout=90)
     if not out:
         return []
     findings: list[Finding] = []

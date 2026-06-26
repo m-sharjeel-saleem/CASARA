@@ -196,6 +196,8 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
     metering.record_review(installation_id)
 
     try:
+        import time as _t
+        t0 = _t.monotonic()
         cfg: CasaraConfig = load_config(repo, head_sha, installation_id)
         files = github.changed_files(repo, pr_number, installation_id)
         files = _scope_by_language(files, cfg.languages)
@@ -204,11 +206,16 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         if max_diff and len(diff) > max_diff:
             diff = diff[:max_diff] + "\n…[diff truncated for length — review focuses on the above]"
         instructions = cfg.instructions_for(files)
+        log.info("review %s: fetched %d files, diff %d chars (%.1fs)",
+                 review.id, len(files), len(diff), _t.monotonic() - t0)
 
         scanner_findings: list[Finding] = []
         with tempfile.TemporaryDirectory() as root:
             _materialize(repo, files, head_sha, root, installation_id)
+            log.info("review %s: materialized (%.1fs)", review.id, _t.monotonic() - t0)
             scanner_findings = scanners.scan_directory(root, cfg.semgrep_config)
+        log.info("review %s: scanners done, %d findings (%.1fs)",
+                 review.id, len(scanner_findings), _t.monotonic() - t0)
 
         # Orchestrated sub-agents: specialized reviewers run in parallel (I/O-bound LLM calls).
         with ThreadPoolExecutor(max_workers=3) as ex:
@@ -218,10 +225,13 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
                 ex.submit(analysis.aicode_agent, diff, scanner_findings, files, instructions),
             ]
             agent_findings = [f for fut in futs for f in fut.result()]
+        log.info("review %s: agents done, %d findings (%.1fs)",
+                 review.id, len(agent_findings), _t.monotonic() - t0)
 
         merged = aggregate(scanner_findings + agent_findings)
         # Grounded critic loop: drop/downgrade likely false positives among AI-only findings.
         merged = analysis.critic(diff, merged)
+        log.info("review %s: critic done (%.1fs)", review.id, _t.monotonic() - t0)
         # Team policy: severity overrides, then noise floor.
         _apply_overrides(merged, cfg.severity_overrides)
         merged = _filter_noise(merged, cfg.noise.min_confidence)

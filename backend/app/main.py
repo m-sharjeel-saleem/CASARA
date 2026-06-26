@@ -1,10 +1,16 @@
 """CASARA backend entry point."""
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+
+# Surface app-level INFO logs (review pipeline stage timing) in the platform logs.
+logging.getLogger("casara").setLevel(logging.INFO)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
 from app.api.dashboard import router as dashboard_router
 from app.api.webhooks import router as webhooks_router
 from app.config import get_settings
