@@ -465,3 +465,31 @@ tried until one returns valid JSON:
 **Proven on the live deployment:** with all 3 Gemini keys exhausted/503, the chain fell through to
 Groq and completed PR #8 with **24 findings, risk 3.25** — e.g. `CWE-200` (keychain export as
 plaintext). The product now keeps working through quota exhaustion. Tests 32 → 35.
+
+---
+
+### Step 14 — Advanced multi-page web app (research-driven)
+
+Deep competitor research (CodeRabbit, Greptile, Semgrep, Snyk, Socket, GitGuardian, Qodo + OSS) drove
+a full web-app build — from a single page to a real product. See `docs/ROADMAP.md`.
+
+**Frontend (Next.js App Router) — sidebar app shell, 8 routes:**
+- Overview, Reviews (search + filters), **Review detail** (`/dashboard/reviews/[id]`: findings grouped
+  by severity, CWE links, category, confidence, AI-signal, copy-fix, **per-finding triage**),
+  Analytics (risk trend, severity/category/CWE/repo breakdowns, block rate, guardrail KPIs),
+  **Settings & Rules** (web config builder + live `.casara.yml` preview), Repositories (per-repo
+  table), Commands (slash-command + config reference).
+- Data layer: **SWR + SSE live invalidation** (replaced full-refetch useEffect), skeleton/empty/error
+  states. Added `swr`.
+
+**Backend — config + commands + triage:**
+- **Per-installation config** persisted in Supabase (`configs` table) and **merged UNDER the repo's
+  `.casara.yml`** at review time (Greptile hierarchy) — web-set custom rules take effect with no commit.
+  `GET/PUT /api/config`, `GET /api/installations`.
+- **PR chat slash-commands**: `@casara review` via the `issue_comment` webhook.
+- **Per-finding triage** (`open`/`ignored`/`false_positive`/`fixed`): `Finding.status` stored inline on
+  the review JSON (no new table); `PUT /api/reviews/{id}/findings/{idx}`.
+
+**Verified live:** config save/read, slash-command-equivalent manual trigger, and triage set→persist→
+read all confirmed against the deployed backend. Backend 35 → 39 tests; frontend builds (8 routes).
+One-time DB step: a `configs` table SQL (user ran it).
