@@ -253,10 +253,10 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
             review.gated = gated
 
         review.summary = analysis.summarize(review.findings, review.risk_score, review.gated)
-        if llm.degraded_count() and get_settings().gemini_keys:
-            review.summary += ("\n\n> ⚠️ AI analysis was rate-limited (Gemini quota) on this run, so "
-                               "this review reflects deterministic scanners only. Re-run when quota "
-                               "resets, or add API quota, for full AI-code analysis.")
+        if llm.degraded_count() and llm.available():
+            review.summary += ("\n\n> ⚠️ AI analysis was rate-limited (all providers' quota exhausted) "
+                               "on this run, so this review reflects deterministic scanners only. "
+                               "Re-run when quota resets, or add API quota, for full AI-code analysis.")
         review.status = "completed"
         review.completed_at = _now()
 

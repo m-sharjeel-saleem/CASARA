@@ -8,6 +8,8 @@ from app.config import get_settings
 def isolated_env(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "")
     monkeypatch.setenv("GEMINI_2", "")
+    monkeypatch.setenv("GEMINI_API_KEY_3", "")
+    monkeypatch.setenv("GROQ_API_KEY_1", "")
     monkeypatch.setenv("GITHUB_TOKEN", "")
     monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "")
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))

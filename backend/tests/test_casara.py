@@ -249,6 +249,27 @@ def test_config_semgrep_passthrough():
     assert parse_config("version: 1").semgrep_config == ""  # default empty
 
 
+def test_llm_backend_ordering(monkeypatch):
+    from app.config import get_settings
+    from app.services import llm
+    monkeypatch.setenv("GEMINI_API_KEY", "AIzareal1")
+    monkeypatch.setenv("GEMINI_2", "AIzareal2")
+    monkeypatch.setenv("GEMINI_API_KEY_3", "AIzareal3")
+    monkeypatch.setenv("GROQ_API_KEY_1", "gsk_real")
+    get_settings.cache_clear()
+    bs = llm._backends()
+    assert [b.provider for b in bs] == ["gemini", "gemini", "gemini", "groq"]
+    assert llm.available() is True
+    get_settings.cache_clear()
+
+
+def test_llm_no_backend_returns_none():
+    # conftest clears all keys → no backends → complete_json returns None (graceful).
+    from app.services import llm
+    assert llm.available() is False
+    assert llm.complete_json("sys", "prompt") is None
+
+
 def test_critic_keyless_keeps_all():
     # No Gemini key → critic returns findings unchanged (graceful).
     from app.agents.analysis import critic

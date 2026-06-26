@@ -8,17 +8,27 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # LLM
+    # Gemini keys, in priority order. Extra keys extend the daily quota; rotation is automatic.
     gemini_api_key: str = ""
-    gemini_2: str = ""          # optional 2nd key (env GEMINI_2) — used when the 1st hits quota
+    gemini_2: str = ""                 # env GEMINI_2
+    gemini_api_key_3: str = ""         # env GEMINI_API_KEY_3
     model_reasoning: str = "gemini-2.5-pro"
     # flash-lite: cheapest + highest free-tier quota + fastest. Best fit for a multi-call pipeline.
     model_fast: str = "gemini-2.5-flash-lite"
 
+    # Groq — final fallback provider (OpenAI-compatible, separate quota pool).
+    groq_api_key_1: str = ""           # env GROQ_API_KEY_1
+    groq_model: str = "llama-3.3-70b-versatile"
+
     @property
     def gemini_keys(self) -> list[str]:
         """All usable Gemini keys, in priority order (rotate on quota errors)."""
-        return [k for k in (self.gemini_api_key, self.gemini_2)
+        return [k for k in (self.gemini_api_key, self.gemini_2, self.gemini_api_key_3)
                 if k and not k.startswith("AIzaSyxxxx")]
+
+    @property
+    def groq_keys(self) -> list[str]:
+        return [k for k in (self.groq_api_key_1,) if k]
     # Min seconds between Gemini calls (free-tier pacing). 0 disables. ~4s ≈ under 15 RPM.
     gemini_min_interval_s: float = 4.0
     # Cap the diff sent to the LLM so large PRs stay fast and under token-per-minute limits.
