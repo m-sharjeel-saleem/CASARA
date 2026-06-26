@@ -12,7 +12,10 @@ export interface Finding {
   confidence: "LOW" | "MEDIUM" | "HIGH";
   verified: boolean;
   ai_signal: string;
+  status: TriageStatus;
 }
+
+export type TriageStatus = "open" | "ignored" | "false_positive" | "fixed";
 
 export interface Review {
   id: string;

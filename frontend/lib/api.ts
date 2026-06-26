@@ -1,4 +1,4 @@
-import type { CasaraConfig, Installation, Review, Stats } from "./types";
+import type { CasaraConfig, Installation, Review, Stats, TriageStatus } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -18,6 +18,16 @@ export const api = {
   reviews: () => get<Review[]>("/api/reviews"),
   review: (id: string) => get<Review>(`/api/reviews/${id}`),
   config: (installationId: number) => get<CasaraConfig>(`/api/config?installation_id=${installationId}`),
+
+  triageFinding: async (reviewId: string, idx: number, status: TriageStatus) => {
+    const res = await fetch(`${API_BASE}/api/reviews/${reviewId}/findings/${idx}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error(`Triage failed (${res.status})`);
+    return res.json() as Promise<Review>;
+  },
 
   saveConfig: async (installationId: number, config: CasaraConfig) => {
     const res = await fetch(`${API_BASE}/api/config`, {

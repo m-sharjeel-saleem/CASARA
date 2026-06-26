@@ -305,6 +305,23 @@ def test_critic_keyless_keeps_all():
     assert critic("some diff", fs) == fs
 
 
+def test_finding_default_status_open():
+    f = _f()
+    assert f.status == "open"
+
+
+def test_triage_persists_via_store():
+    r = Review(id="triage1", repo="o/r", pr_number=3, status="completed",
+               findings=[_f(), _f(file="b.py")], created_at="2026-06-27T00:00:00Z")
+    store.save_review(r)
+    got = store.get_review("triage1")
+    got.findings[1].status = "false_positive"
+    store.save_review(got)
+    again = store.get_review("triage1")
+    assert again.findings[0].status == "open"
+    assert again.findings[1].status == "false_positive"
+
+
 def test_store_roundtrip():
     r = Review(id="abc123", repo="o/r", pr_number=5, status="completed",
                risk_score=4.2, findings=[_f()], created_at="2026-01-01T00:00:00Z")

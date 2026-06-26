@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 Severity = Literal["info", "low", "medium", "high", "critical"]
 Confidence = Literal["LOW", "MEDIUM", "HIGH"]
 ReviewStatus = Literal["pending", "running", "completed", "failed"]
+TriageStatus = Literal["open", "ignored", "false_positive", "fixed"]
 
 # Which scanner sources count toward the SAST dimension of the risk score.
 SAST_SOURCES = {"semgrep", "bandit"}
@@ -23,6 +24,7 @@ class Finding(BaseModel):
     confidence: Confidence = "MEDIUM"
     verified: bool = False            # confirmed by >=2 sources (deterministic + agent)
     ai_signal: str = ""               # why this looks AI-generated (set by the ai-code agent)
+    status: TriageStatus = "open"     # triage state, editable from the dashboard
 
 
 class Review(BaseModel):

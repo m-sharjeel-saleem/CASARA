@@ -82,6 +82,28 @@ def get_review(review_id: str) -> dict:
     return review.model_dump()
 
 
+class TriageUpdate(BaseModel):
+    status: str = Field(..., examples=["open", "ignored", "false_positive", "fixed"])
+
+
+_TRIAGE_STATES = {"open", "ignored", "false_positive", "fixed"}
+
+
+@router.put("/reviews/{review_id}/findings/{idx}")
+def triage_finding(review_id: str, idx: int, req: TriageUpdate) -> dict:
+    """Set the triage status of one finding (stored inline on the review — no extra table)."""
+    if req.status not in _TRIAGE_STATES:
+        raise HTTPException(status_code=422, detail=f"invalid status {req.status!r}")
+    review = store.get_review(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="review not found")
+    if idx < 0 or idx >= len(review.findings):
+        raise HTTPException(status_code=404, detail="finding index out of range")
+    review.findings[idx].status = req.status  # type: ignore[assignment]
+    store.save_review(review)
+    return review.model_dump()
+
+
 class RunRequest(BaseModel):
     repo: str = Field(..., examples=["owner/name", "https://github.com/owner/name/pull/8"])
     pr_number: int | None = Field(None, examples=[8])
