@@ -2,8 +2,9 @@
 
 import { motion } from "framer-motion";
 import {
-  BadgeCheck, Bot, ChevronDown, GitPullRequest, Loader2, ShieldAlert, ShieldCheck, Wrench,
+  BadgeCheck, Bot, ChevronDown, ExternalLink, GitPullRequest, Loader2, ShieldAlert, ShieldCheck, Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
@@ -126,6 +127,12 @@ export function ReviewCard({ review, index = 0 }: { review: Review; index?: numb
 
       {open && (
         <div className="border-t border-border px-4 pb-4 pt-3">
+          <div className="mb-3 flex justify-end">
+            <Link href={`/dashboard/reviews/${review.id}`}
+              className="inline-flex items-center gap-1 text-[11px] text-accent-soft hover:text-white">
+              Full detail & triage <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
           {review.summary && (
             <div className="prose prose-invert prose-sm mb-4 max-w-none text-slate-300">
               <ReactMarkdown>{review.summary}</ReactMarkdown>

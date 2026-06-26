@@ -53,9 +53,21 @@ def delete_installation(inst_id: int) -> None:
     _backend().delete_installation(inst_id)
 
 
+def list_installations() -> list[dict]:
+    return _backend().list_installations()
+
+
 def incr_usage(inst_id: int, period: str) -> int:
     return _backend().incr_usage(inst_id, period)
 
 
 def get_usage(inst_id: int, period: str) -> int:
     return _backend().get_usage(inst_id, period)
+
+
+def get_config(inst_id: int) -> dict:
+    return _backend().get_config(inst_id)
+
+
+def set_config(inst_id: int, data: dict, updated_at: str) -> None:
+    _backend().set_config(inst_id, data, updated_at)

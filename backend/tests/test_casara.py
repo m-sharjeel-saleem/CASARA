@@ -218,6 +218,26 @@ severity_overrides:
     assert parse_config(None).languages == []
 
 
+def test_config_merge_dashboard_under_repo():
+    from app.core.config_file import _build, _merge
+    dashboard = {"gate": {"level": "warning"}, "rules": [{"path": "**/*.py", "instructions": "dash"}],
+                 "severity_overrides": {"CWE-1": "low"}}
+    repo = {"gate": {"level": "error"}, "rules": [{"path": "src/**", "instructions": "repo"}],
+            "severity_overrides": {"CWE-89": "critical"}}
+    merged = _merge(dashboard, repo)
+    cfg = _build(merged)
+    assert cfg.gate.level == "error"               # repo overrides dashboard
+    assert len(cfg.rules) == 2                      # rules combined
+    assert cfg.severity_overrides == {"CWE-1": "low", "CWE-89": "critical"}  # merged
+
+
+def test_config_persist_roundtrip():
+    store.set_config(7777, {"languages": ["python"], "gate": {"level": "warning"}},
+                     "2026-06-27T00:00:00Z")
+    got = store.get_config(7777)
+    assert got["languages"] == ["python"] and got["gate"]["level"] == "warning"
+
+
 def test_config_instructions_match_glob():
     from app.core.config_file import parse_config
     cfg = parse_config('rules:\n  - path: "**/*.py"\n    instructions: "No eval."')

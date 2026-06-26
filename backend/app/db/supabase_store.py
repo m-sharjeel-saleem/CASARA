@@ -136,6 +136,34 @@ def incr_usage(inst_id: int, period: str) -> int:
     return current + 1
 
 
+def list_installations() -> list[dict]:
+    base, headers = _rest()
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{base}/installations", headers=headers,
+                  params={"select": "*", "order": "created_at.desc"})
+        return r.json() if r.status_code < 300 else []
+
+
+def get_config(inst_id: int) -> dict:
+    base, headers = _rest()
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{base}/configs", headers=headers,
+                  params={"installation_id": f"eq.{inst_id}", "select": "data", "limit": 1})
+        rows = r.json() if r.status_code < 300 else []
+    return (rows[0].get("data") or {}) if rows else {}
+
+
+def set_config(inst_id: int, data: dict, updated_at: str) -> None:
+    base, headers = _rest()
+    headers = {**headers, "Prefer": "resolution=merge-duplicates"}
+    with httpx.Client(timeout=30) as c:
+        r = c.post(f"{base}/configs", headers=headers,
+                   json={"installation_id": inst_id, "data": data, "updated_at": updated_at})
+        if r.status_code >= 300:
+            log.error("supabase set_config failed %s: %s", r.status_code, r.text[:200])
+            raise RuntimeError(f"set_config {r.status_code}")
+
+
 def stats(installation_id: int | None = None) -> dict:
     reviews = list_reviews(limit=1000, installation_id=installation_id)
     done = [r for r in reviews if r.status == "completed"]

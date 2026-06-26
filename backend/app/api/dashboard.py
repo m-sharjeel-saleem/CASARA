@@ -30,6 +30,40 @@ def install_url() -> dict:
     return {"configured": False, "url": None}
 
 
+@router.get("/installations")
+def list_installations() -> list[dict]:
+    """Connected installations (tenants) for the repo picker / settings scope."""
+    return store.list_installations()
+
+
+@router.get("/config")
+def get_config(installation_id: int) -> dict:
+    """Dashboard org-default config for an installation (merged under repo .casara.yml)."""
+    from app.core.config_file import CasaraConfig
+    data = store.get_config(installation_id)
+    # Return a fully-populated object (defaults filled) so the UI can render every field.
+    return CasaraConfig(**data).model_dump() if data else CasaraConfig().model_dump()
+
+
+class ConfigUpdate(BaseModel):
+    installation_id: int
+    config: dict
+
+
+@router.put("/config")
+def put_config(req: ConfigUpdate) -> dict:
+    """Validate + persist dashboard config. Validation mirrors what the reviewer enforces."""
+    from datetime import datetime, timezone
+
+    from app.core.config_file import CasaraConfig
+    try:
+        validated = CasaraConfig(**req.config).model_dump()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"invalid config: {e}") from e
+    store.set_config(req.installation_id, validated, datetime.now(timezone.utc).isoformat())
+    return {"status": "saved", "config": validated}
+
+
 @router.get("/stats")
 def get_stats() -> dict:
     return store.stats()

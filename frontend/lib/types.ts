@@ -37,3 +37,28 @@ export interface Stats {
   avg_risk: number;
   total_findings: number;
 }
+
+export interface Installation {
+  id: number;
+  account: string;
+  account_type: string;
+  repo_count: number;
+  created_at: string;
+  suspended?: boolean;
+}
+
+export interface PathRule {
+  path: string;
+  instructions: string;
+  severity: Severity | null;
+}
+
+export interface CasaraConfig {
+  version: number;
+  languages: string[];
+  rules: PathRule[];
+  gate: { level: "off" | "warning" | "error"; threshold: number };
+  noise: { max_comments: number; min_confidence: "LOW" | "MEDIUM" | "HIGH" };
+  severity_overrides: Record<string, Severity>;
+  semgrep_config: string;
+}

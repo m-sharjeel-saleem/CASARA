@@ -82,25 +82,64 @@ def _match(path: str, pattern: str) -> bool:
 _DEFAULT = CasaraConfig()
 
 
-def parse_config(text: str | None) -> CasaraConfig:
-    """Parse YAML text into a validated config; return defaults on any problem."""
+def _yaml_dict(text: str | None) -> dict:
     if not text:
-        return _DEFAULT
+        return {}
     try:
         data = yaml.safe_load(text)
-        if not isinstance(data, dict):
-            return _DEFAULT
+        return data if isinstance(data, dict) else {}
+    except yaml.YAMLError as e:
+        log.warning("invalid YAML config: %s", e)
+        return {}
+
+
+def _merge(base: dict, over: dict) -> dict:
+    """Greptile-style merge: `over` (repo file) wins; rules/overrides are combined."""
+    out = dict(base)
+    for k, v in over.items():
+        if k == "rules" and isinstance(v, list) and isinstance(base.get("rules"), list):
+            out["rules"] = base["rules"] + v
+        elif k == "severity_overrides" and isinstance(v, dict) and isinstance(base.get(k), dict):
+            out["severity_overrides"] = {**base[k], **v}
+        else:
+            out[k] = v
+    return out
+
+
+def _build(data: dict) -> CasaraConfig:
+    try:
         return CasaraConfig(**data)
-    except (yaml.YAMLError, ValidationError, TypeError) as e:
-        log.warning("invalid .casara.yml, using defaults: %s", e)
+    except (ValidationError, TypeError) as e:
+        log.warning("invalid merged config, using defaults: %s", e)
         return _DEFAULT
+
+
+def parse_config(text: str | None) -> CasaraConfig:
+    """Parse YAML text into a validated config; return defaults on any problem."""
+    data = _yaml_dict(text)
+    return _build(data) if data else _DEFAULT
 
 
 def load_config(repo: str, ref: str, installation_id: int | None = None) -> CasaraConfig:
-    """Fetch and parse `.casara.yml` (or `.yaml`) from the repo at `ref`."""
+    """Effective config = dashboard org defaults (Supabase) merged UNDER the repo's
+    `.casara.yml` (repo file wins). Lets teams configure rules from the web OR the repo."""
     from app.services import github
+
+    dashboard: dict = {}
+    if installation_id:
+        try:
+            from app.db import store
+            dashboard = store.get_config(installation_id) or {}
+        except Exception as e:  # noqa: BLE001 — never let config read break a review
+            log.warning("dashboard config read failed: %s", e)
+
+    repo_cfg: dict = {}
     for path in CONFIG_PATHS:
         text = github.fetch_file(repo, path, ref, installation_id)
         if text is not None:
-            return parse_config(text)
-    return _DEFAULT
+            repo_cfg = _yaml_dict(text)
+            break
+
+    if not dashboard and not repo_cfg:
+        return _DEFAULT
+    return _build(_merge(dashboard, repo_cfg))

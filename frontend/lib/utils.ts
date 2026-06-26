@@ -58,6 +58,28 @@ export function topSeverity(findings: Finding[]): Severity | null {
   return top;
 }
 
+/** Link to the MITRE CWE definition for a "CWE-89" style id. */
+export function cweUrl(cweId: string): string | null {
+  const m = /CWE-(\d+)/i.exec(cweId || "");
+  return m ? `https://cwe.mitre.org/data/definitions/${m[1]}.html` : null;
+}
+
+/** Coarse category for grouping/analytics, derived from the source + CWE. */
+export function findingCategory(f: Finding): string {
+  if (f.source === "gitleaks" || f.cwe_id === "CWE-798") return "Secrets";
+  if (f.source === "depscan") return "Supply chain";
+  if (f.ai_signal) return "AI-generated code";
+  if (f.source === "logic-agent") return "Logic / reliability";
+  return "Code security";
+}
+
+/** Count findings by an arbitrary key function. */
+export function countBy<T>(items: T[], key: (t: T) => string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const it of items) { const k = key(it); out[k] = (out[k] ?? 0) + 1; }
+  return out;
+}
+
 /** Group findings by severity, ordered critical→info. */
 export function groupBySeverity(findings: Finding[]): [Severity, Finding[]][] {
   const groups = new Map<Severity, Finding[]>();

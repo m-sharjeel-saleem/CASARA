@@ -48,6 +48,13 @@ create table if not exists usage_counters (
     reviews_run     integer default 0,
     primary key (installation_id, period)
 );
+
+-- Per-installation dashboard config (org defaults; merged under the repo's .casara.yml).
+create table if not exists configs (
+    installation_id integer primary key,
+    data            text,
+    updated_at      text
+);
 """
 
 
@@ -133,6 +140,12 @@ def delete_installation(inst_id: int) -> None:
         con.execute("delete from installations where id=?", (inst_id,))
 
 
+def list_installations() -> list[dict]:
+    with _conn() as con:
+        rows = con.execute("select * from installations order by created_at desc").fetchall()
+        return [dict(r) for r in rows]
+
+
 def incr_usage(inst_id: int, period: str) -> int:
     with _conn() as con:
         con.execute(
@@ -156,6 +169,21 @@ def get_usage(inst_id: int, period: str) -> int:
             (inst_id, period),
         ).fetchone()
         return row["reviews_run"] if row else 0
+
+
+def get_config(inst_id: int) -> dict:
+    with _conn() as con:
+        row = con.execute("select data from configs where installation_id=?", (inst_id,)).fetchone()
+    return json.loads(row["data"]) if row and row["data"] else {}
+
+
+def set_config(inst_id: int, data: dict, updated_at: str) -> None:
+    with _conn() as con:
+        con.execute(
+            """insert into configs (installation_id, data, updated_at) values (?,?,?)
+               on conflict(installation_id) do update set data=excluded.data, updated_at=excluded.updated_at""",
+            (inst_id, json.dumps(data), updated_at),
+        )
 
 
 def stats() -> dict:

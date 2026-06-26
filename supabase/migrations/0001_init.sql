@@ -54,6 +54,16 @@ create table if not exists public.usage_counters (
     primary key (installation_id, period)
 );
 
+-- ---------------------------------------------------------------------------
+-- configs: per-installation dashboard config (org defaults; merged UNDER the
+-- repo's .casara.yml at review time, Greptile-style hierarchy).
+-- ---------------------------------------------------------------------------
+create table if not exists public.configs (
+    installation_id bigint primary key references public.installations (id) on delete cascade,
+    data            jsonb not null default '{}'::jsonb,
+    updated_at      timestamptz not null default now()
+);
+
 -- ===========================================================================
 -- Row-Level Security: users may READ only data for installations they own.
 -- The backend uses the service-role key (which bypasses RLS) to WRITE review
@@ -62,6 +72,14 @@ create table if not exists public.usage_counters (
 alter table public.installations  enable row level security;
 alter table public.reviews        enable row level security;
 alter table public.usage_counters enable row level security;
+alter table public.configs        enable row level security;
+
+create policy configs_owner_read on public.configs
+    for select using (
+        installation_id in (
+            select id from public.installations where owner_user_id = auth.uid()
+        )
+    );
 
 -- Owners can see their installations.
 create policy installations_owner_read on public.installations

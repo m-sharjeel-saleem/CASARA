@@ -52,6 +52,30 @@ export function Sparkline({ values, w = 120, h = 34 }: { values: number[]; w?: n
   );
 }
 
+/** Ranked horizontal bar list (category/repo/CWE breakdowns). */
+export function BarList({ items, color = "#6d7bff", empty = "No data yet" }: {
+  items: { label: string; value: number; href?: string }[]; color?: string; empty?: string;
+}) {
+  if (items.length === 0) return <p className="py-6 text-center text-xs text-slate-600">{empty}</p>;
+  const max = Math.max(...items.map((i) => i.value), 1);
+  return (
+    <div className="space-y-2">
+      {items.map((it) => (
+        <div key={it.label} className="group">
+          <div className="mb-1 flex items-center justify-between text-[12px]">
+            <span className="truncate pr-2 text-slate-300">{it.label}</span>
+            <span className="font-mono tnum text-slate-400">{it.value}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${(it.value / max) * 100}%`, background: color }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Stacked horizontal bar of severity counts with a legend. */
 export function SeverityBar({ counts }: { counts: Record<Severity, number> }) {
   const total = SEV_ORDER.reduce((s, k) => s + counts[k], 0);
