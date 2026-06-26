@@ -170,6 +170,14 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         author=author, head_sha=head_sha, installation_id=installation_id,
         status="running", created_at=_now(),
     )
+    # Self-heal: a review row references its installation via a foreign key. If the
+    # install webhook that registers the tenant was missed, ensure the parent row
+    # exists so persisting the review never fails on the FK constraint.
+    if installation_id:
+        try:
+            store.upsert_installation(installation_id, repo.split("/")[0], "", 0, _now())
+        except Exception as e:  # noqa: BLE001 — best effort; never block the review
+            log.warning("ensure installation %s failed: %s", installation_id, e)
     store.save_review(review)
     events.publish("review.started", review.model_dump())
 

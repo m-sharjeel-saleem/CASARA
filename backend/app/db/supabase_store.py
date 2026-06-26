@@ -49,13 +49,24 @@ def save_review(review: Review) -> None:
     with httpx.Client(timeout=30) as c:
         r = c.post(f"{base}/reviews", headers=headers, json=_review_payload(review))
         if r.status_code >= 300:
-            log.warning("supabase save_review failed %s: %s", r.status_code, r.text[:200])
+            # Loud + raised: a silently-dropped persist is worse than a failed review.
+            log.error("supabase save_review failed %s: %s", r.status_code, r.text[:300])
+            raise RuntimeError(f"supabase save_review {r.status_code}: {r.text[:200]}")
+
+
+# String columns are nullable in Postgres; the model wants "" not None.
+_STR_FIELDS = ("pr_title", "author", "head_sha", "summary", "repo", "status")
 
 
 def _to_review(row: dict) -> Review:
     findings = row.pop("findings", []) or []
-    return Review(**{k: row.get(k) for k in Review.model_fields if k != "findings"},
-                  findings=findings)
+    data = {k: row.get(k) for k in Review.model_fields if k != "findings"}
+    for f in _STR_FIELDS:
+        if data.get(f) is None:
+            data[f] = ""
+    if data.get("risk_score") is None:
+        data["risk_score"] = 0.0
+    return Review(**data, findings=findings)
 
 
 def get_review(review_id: str) -> Review | None:
