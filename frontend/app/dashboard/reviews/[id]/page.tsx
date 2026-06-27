@@ -38,13 +38,16 @@ function SevPill({ s }: { s: Severity }) {
   );
 }
 
-function FindingDetail({ f, idx, reviewId, onTriaged }: {
-  f: Finding; idx: number; reviewId: string; onTriaged: () => void;
+function FindingDetail({ f, idx, reviewId, repo, sha, onTriaged }: {
+  f: Finding; idx: number; reviewId: string; repo: string; sha: string; onTriaged: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const cwe = cweUrl(f.cwe_id);
   const dimmed = f.status === "ignored" || f.status === "false_positive";
+  const ghUrl = f.file && sha
+    ? `https://github.com/${repo}/blob/${sha}/${f.file}${f.line ? `#L${f.line}` : ""}`
+    : null;
   const copyFix = () => {
     navigator.clipboard?.writeText(f.fix_prompt).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 2000);
@@ -83,9 +86,15 @@ function FindingDetail({ f, idx, reviewId, onTriaged }: {
         <span className="ml-auto font-mono text-[11px] text-slate-500">via {f.source}</span>
       </div>
 
-      <code className="mt-3 block font-mono text-[12px] text-slate-300">
-        {f.file}{f.line ? `:${f.line}` : ""}
-      </code>
+      <div className="mt-3 flex items-center gap-2">
+        <code className="font-mono text-[12px] text-slate-300">{f.file}{f.line ? `:${f.line}` : ""}</code>
+        {ghUrl && (
+          <a href={ghUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] text-slate-400 transition hover:bg-white/5 hover:text-white">
+            View on GitHub <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        )}
+      </div>
       <p className="mt-2 text-[14px] leading-relaxed text-slate-200">{f.message}</p>
 
       {f.fix_prompt && (
@@ -198,7 +207,8 @@ export default function ReviewDetail() {
                 </div>
                 <div className="space-y-3">
                   {items.map(({ f, idx }) => (
-                    <FindingDetail key={idx} f={f} idx={idx} reviewId={review.id} onTriaged={() => mutate()} />
+                    <FindingDetail key={idx} f={f} idx={idx} reviewId={review.id}
+                      repo={review.repo} sha={review.head_sha} onTriaged={() => mutate()} />
                   ))}
                 </div>
               </section>
