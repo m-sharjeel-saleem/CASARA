@@ -3,6 +3,7 @@
 import { ArrowRight, Radar, ShieldX } from "lucide-react";
 import Link from "next/link";
 
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { MetricsPanel } from "@/components/MetricsPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { ReviewCard } from "@/components/ReviewCard";
@@ -18,6 +19,8 @@ export default function Overview() {
   return (
     <>
       <PageHeader eyebrow="Security Console" title={<>Pull-request <span className="text-gradient">threat radar</span></>} />
+
+      <ConnectionStatus />
 
       <div className="space-y-5">
         <TriggerBar onTriggered={() => mutate()} />
