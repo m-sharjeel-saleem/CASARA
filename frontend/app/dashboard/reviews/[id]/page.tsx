@@ -75,6 +75,12 @@ function FindingDetail({ f, idx, reviewId, repo, sha, onTriaged }: {
             {f.exploitability === "noise" ? "low signal" : `${f.exploitability} exploit`}
           </span>
         )}
+        {f.epss > 0 && (
+          <span className="rounded-full border border-sev-critical/30 bg-sev-critical/10 px-2 py-0.5 text-[10px] font-medium text-sev-critical"
+            title="EPSS: probability of exploitation in the next 30 days (FIRST.org)">
+            EPSS {Math.round(f.epss * 100)}%
+          </span>
+        )}
         <span className="rounded-full border border-border bg-white/[0.03] px-2 py-0.5 text-[10px] text-slate-400">
           {findingCategory(f)}
         </span>

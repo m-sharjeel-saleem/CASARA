@@ -21,7 +21,7 @@ from app.core import events
 from app.core.risk import compute_risk, should_gate
 from app.db import store
 from app.models import Finding, Review
-from app.services import github, llm, scanners
+from app.services import epss, github, llm, scanners
 from app.services.review import aggregate
 
 log = logging.getLogger("casara.audit")
@@ -161,9 +161,11 @@ def run_audit(repo: str, installation_id: int | None = None) -> Review:
         else:
             raise RuntimeError("could not download repository tarball")
 
-        # Triage ranks by exploitability and demotes noise. (No critic here: it needs a diff
-        # to validate against; audit findings already come from analysing the real code bundle.)
-        review.findings = analysis.triage("", aggregate(findings))
+        # EPSS-enrich CVE findings, then triage by exploitability and demote noise. (No critic
+        # here: it needs a diff to validate against; audit findings come from the real code bundle.)
+        merged = aggregate(findings)
+        epss.enrich(merged)
+        review.findings = analysis.triage("", merged)
         review.risk_score, _ = compute_risk(review.findings, [f.file for f in review.findings])
         review.gated, _ = should_gate(review.findings, review.risk_score, cfg.gate.threshold)
         grade = grade_for(review.risk_score)

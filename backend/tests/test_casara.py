@@ -334,6 +334,21 @@ def test_triage_empty():
     assert triage("diff", []) == []
 
 
+def test_epss_floor_overrides_priority():
+    from app.agents.analysis import _apply_epss
+    f = _f(severity="low"); f.epss = 0.8; f.priority = 20; f.exploitability = "low"
+    _apply_epss(f)
+    assert f.exploitability == "high" and f.priority >= 88   # high EPSS can't stay low
+
+
+def test_epss_no_cve_no_network():
+    # No CVE ids → enrich() returns immediately without any network call.
+    from app.services.epss import enrich
+    fs = [_f(cwe_id="CWE-89")]
+    enrich(fs)
+    assert fs[0].epss == 0.0
+
+
 def test_critic_keyless_keeps_all():
     # No Gemini key → critic returns findings unchanged (graceful).
     from app.agents.analysis import critic

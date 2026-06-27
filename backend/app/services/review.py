@@ -19,7 +19,7 @@ from app.core.config_file import CasaraConfig, load_config
 from app.core.risk import compute_risk, should_gate
 from app.db import store
 from app.models import Confidence, Finding, Review
-from app.services import github, metering, scanners
+from app.services import epss, github, metering, scanners
 
 log = logging.getLogger("casara.review")
 
@@ -238,7 +238,8 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         merged = aggregate(scanner_findings + agent_findings)
         # Grounded critic loop: drop/downgrade likely false positives among AI-only findings.
         merged = analysis.critic(diff, merged)
-        # Triage: rank by real-world exploitability; demote noise so it stops inflating the score.
+        # Enrich CVE findings with live EPSS exploit-probability, then triage by exploitability.
+        epss.enrich(merged)
         merged = analysis.triage(diff, merged)
         log.info("review %s: critic+triage done (%.1fs)", review.id, _t.monotonic() - t0)
         # Team policy: severity overrides, then noise floor.

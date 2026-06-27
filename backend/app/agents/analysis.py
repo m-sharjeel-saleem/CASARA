@@ -192,14 +192,16 @@ def triage(diff: str, findings: list[Finding]) -> list[Finding]:
         return findings
 
     if not llm.available():
-        for f in findings:  # deterministic fallback: severity drives priority
+        for f in findings:  # deterministic fallback: severity (+ EPSS) drives priority
             f.priority = {"critical": 95, "high": 80, "medium": 55, "low": 30, "info": 10}.get(f.severity, 40)
             f.exploitability = f.exploitability or ("high" if f.severity in ("critical", "high") else "medium")
+            _apply_epss(f)
         findings.sort(key=lambda f: f.priority, reverse=True)
         return findings
 
     listing = "\n".join(
-        f"[{i}] {f.severity} {f.cwe_id} {f.file}:{f.line} ({f.source}{' verified' if f.verified else ''}) — {f.message}"
+        f"[{i}] {f.severity} {f.cwe_id} {f.file}:{f.line} ({f.source}"
+        f"{' verified' if f.verified else ''}{f' EPSS={f.epss:.2f}' if f.epss else ''}) — {f.message}"
         for i, f in enumerate(findings)
     )
     raw = llm.complete_json(TRIAGE_SYSTEM,
@@ -222,8 +224,19 @@ def triage(diff: str, findings: list[Finding]) -> list[Finding]:
         if f.exploitability == "noise" and not f.verified:
             f.severity = "info"  # type: ignore[assignment]
             f.cvss_estimate = 1.0
+        _apply_epss(f)
     findings.sort(key=lambda f: f.priority, reverse=True)
     return findings
+
+
+def _apply_epss(f: Finding) -> None:
+    """A known CVE with high real-world exploit probability can't be ranked low — EPSS overrides."""
+    if f.epss >= 0.5:
+        f.exploitability = "high"
+        f.priority = max(f.priority, 88)
+    elif f.epss >= 0.1 and f.exploitability in ("", "low", "noise"):
+        f.exploitability = "medium"
+        f.priority = max(f.priority, 65)
 
 
 def summarize(findings: list[Finding], risk_score: float, gated: bool) -> str:

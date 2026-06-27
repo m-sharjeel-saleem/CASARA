@@ -15,6 +15,7 @@ export interface Finding {
   status: TriageStatus;
   priority: number;
   exploitability: string;
+  epss: number;
 }
 
 export type TriageStatus = "open" | "ignored" | "false_positive" | "fixed";

@@ -27,6 +27,7 @@ class Finding(BaseModel):
     status: TriageStatus = "open"     # triage state, editable from the dashboard
     priority: int = 0                 # 0-100 real-world priority (set by the triage agent)
     exploitability: str = ""          # high|medium|low|noise (set by the triage agent)
+    epss: float = 0.0                 # EPSS exploit-probability (0-1) for CVE findings
 
 
 class Review(BaseModel):
