@@ -11,9 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-cer
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-# Deterministic scanners. Pure-pip: Semgrep (SAST), Bandit (Python), GuardDog (malware/
-# malicious-package detection). depscan (our supply-chain heuristics) is pure-Python.
-RUN pip install semgrep==1.97.0 bandit==1.8.0 guarddog==1.8.0
+# Deterministic scanners (main env): Semgrep (SAST) + Bandit (Python).
+RUN pip install semgrep==1.97.0 bandit==1.8.0
+
+# GuardDog (malware / malicious-package detection) pins an older semgrep, so install it in an
+# ISOLATED venv and expose just its CLI — avoids clashing with the app's semgrep 1.97.
+RUN python -m venv /opt/guarddog \
+    && /opt/guarddog/bin/pip install --no-cache-dir guarddog==1.8.0 \
+    && ln -s /opt/guarddog/bin/guarddog /usr/local/bin/guarddog \
+    || echo "guarddog install best-effort; pipeline degrades gracefully if absent"
 
 # Single-binary scanners for the whole-repo audit: OSV-Scanner (dependency vulns from 20+
 # advisory sources) and Trivy (misconfig/IaC + secrets). Installed to /usr/local/bin.
