@@ -15,6 +15,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 
+from app.agents import analysis
 from app.core.config_file import load_config
 from app.core import events
 from app.core.risk import compute_risk, should_gate
@@ -25,6 +26,50 @@ from app.services.review import aggregate
 
 log = logging.getLogger("casara.audit")
 AUDIT_PR_NUMBER = 0  # marks a Review as a whole-repo audit
+
+# Source extensions the AI reviewer understands; everything else is left to scanners.
+_CODE_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".rb", ".php", ".java", ".rs",
+             ".c", ".h", ".cpp", ".cs", ".swift", ".kt", ".scala", ".sh", ".sql"}
+# Path fragments that signal security-sensitive code — scanned first.
+_SENSITIVE = ("auth", "login", "session", "password", "token", "crypto", "secret", "key",
+              "payment", "billing", "network", "api", "db", "database", "keychain", "admin")
+_SKIP_DIRS = ("/node_modules/", "/.git/", "/vendor/", "/dist/", "/build/", "/.next/",
+              "/pods/", "/pod/", "/third_party/", "/.venv/")
+_BUNDLE_CAP = 40000   # max chars of source sent to the AI per audit (cost + context bound)
+
+
+def _code_bundle(root: str) -> tuple[str, list[str]]:
+    """Concatenate security-relevant source files (sensitive paths first) up to a cap,
+    so the AI agents can review a whole repo in one bounded pass."""
+    candidates: list[tuple[int, str]] = []
+    for dirpath, _dirs, files in os.walk(root):
+        low = (dirpath + "/").lower()
+        if any(s in low for s in _SKIP_DIRS):
+            continue
+        for fn in files:
+            if os.path.splitext(fn)[1].lower() not in _CODE_EXT:
+                continue
+            full = os.path.join(dirpath, fn)
+            rel = os.path.relpath(full, root)
+            score = 1 if any(s in rel.lower() for s in _SENSITIVE) else 0
+            candidates.append((score, full))
+    candidates.sort(key=lambda c: c[0], reverse=True)  # sensitive files first
+
+    parts: list[str] = []
+    used_files: list[str] = []
+    total = 0
+    for _score, full in candidates:
+        try:
+            with open(full, encoding="utf-8", errors="replace") as fh:
+                content = fh.read(8000)  # cap per file
+        except OSError:
+            continue
+        rel = os.path.relpath(full, root)
+        block = f"\n### FILE: {rel}\n{content}\n"
+        if total + len(block) > _BUNDLE_CAP:
+            break
+        parts.append(block); used_files.append(rel); total += len(block)
+    return "".join(parts), used_files
 
 
 def _now() -> str:
@@ -99,6 +144,16 @@ def run_audit(repo: str, installation_id: int | None = None) -> Review:
                     scan_root = entries[0] if len(entries) == 1 and os.path.isdir(entries[0]) else root
                     log.info("audit %s: scanning %s", review.id, repo)
                     findings = scanners.scan_full(scan_root, cfg.semgrep_config)
+                    # AI pass over the repo's source — essential for languages the
+                    # deterministic scanners don't cover (e.g. Swift, Kotlin).
+                    bundle, used = _code_bundle(scan_root)
+                    if bundle:
+                        instructions = cfg.instructions_for(used)
+                        ai = (analysis.security_agent(bundle, findings, instructions)
+                              + analysis.aicode_agent(bundle, findings, used, instructions))
+                        log.info("audit %s: AI pass over %d files -> %d findings",
+                                 review.id, len(used), len(ai))
+                        findings += ai
         else:
             raise RuntimeError("could not download repository tarball")
 

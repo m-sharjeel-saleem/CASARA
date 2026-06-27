@@ -21,14 +21,19 @@ RUN python -m venv /opt/guarddog \
     && ln -s /opt/guarddog/bin/guarddog /usr/local/bin/guarddog \
     || echo "guarddog install best-effort; pipeline degrades gracefully if absent"
 
-# Single-binary scanners for the whole-repo audit: OSV-Scanner (dependency vulns from 20+
-# advisory sources) and Trivy (misconfig/IaC + secrets). Installed to /usr/local/bin.
+# Single-binary scanners for the whole-repo audit: OSV-Scanner (dependency vulns) and Trivy
+# (misconfig/IaC + secrets). Direct binary downloads to /usr/local/bin (best-effort).
 RUN ARCH=$(dpkg --print-architecture) \
     && curl -sSfL "https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_${ARCH}" \
        -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner \
-    && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-       | sh -s -- -b /usr/local/bin v0.58.1 \
-    || echo "scanner binary install best-effort; pipeline degrades gracefully if absent"
+    || echo "osv-scanner install best-effort"
+RUN ARCH=$(dpkg --print-architecture) \
+    && TARCH=$( [ "$ARCH" = "arm64" ] && echo "Linux-ARM64" || echo "Linux-64bit" ) \
+    && curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v0.58.1/trivy_0.58.1_${TARCH}.tar.gz" \
+       -o /tmp/trivy.tgz \
+    && tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy && chmod +x /usr/local/bin/trivy \
+    && rm -f /tmp/trivy.tgz \
+    || echo "trivy install best-effort; pipeline degrades gracefully if absent"
 
 COPY app ./app
 
