@@ -493,3 +493,35 @@ a full web-app build — from a single page to a real product. See `docs/ROADMAP
 **Verified live:** config save/read, slash-command-equivalent manual trigger, and triage set→persist→
 read all confirmed against the deployed backend. Backend 35 → 39 tests; frontend builds (8 routes).
 One-time DB step: a `configs` table SQL (user ran it).
+
+---
+
+### Step 15 — Production-grade scanner suite + whole-repo security audit
+
+Research-verified (Trivy ~32k★, OSV-Scanner, GuardDog malware detection, Aikido/Snyk scoring,
+grounded AI remediation — the "fixes 2/3 automatically" marketing claim was *refuted*).
+
+**New scanners (graceful skip if absent), installed in the Docker image:**
+- **OSV-Scanner** ✓ (dependency vulns, 20+ advisory sources) — binary.
+- **GuardDog** ✓ (DataDog — **malicious/compromised PyPI & npm package detection** = malware) —
+  installed in an isolated venv (it pins an older semgrep; isolation avoids the clash).
+- **Trivy** (misconfig/IaC + secrets) — best-effort; currently failing to install on HF, degrades
+  gracefully (OSV + GuardDog + AI cover deps/malware/code/secrets).
+
+**Whole-repo audit** (`services/audit.py`, `POST /api/audit/run`): downloads the repo tarball → runs
+the **full scanner suite** over everything → plus an **AI pass** that bundles security-relevant
+source files (sensitive paths first, capped 40k chars) through the security + ai-code agents
+(essential for languages scanners don't cover, e.g. Swift) → aggregates → computes a **security grade
+A–F** → an **LLM remediation plan grounded only in finding metadata** (CodeReduce → less
+hallucination). Stored as a Review with `pr_number=0` (audit marker) — reuses all storage/UI, **no
+schema change**.
+
+**Frontend:** Repositories page has a full-repo **audit trigger** (top + per-row) and a per-repo
+**security grade** column; review cards show audits with an A–F grade badge; **connected-account
+status banner** on Overview.
+
+**Verified live:** audit of BaatCheet_IOS → **grade B, 9 findings, AI remediation plan**; logs confirm
+OSV-Scanner + GuardDog ran. Backend 39 → 40 tests; frontend builds (8 routes).
+
+> Remaining from this request: the **complete advanced UI redesign** (premium security-posture look)
+> — a separate focused pass.
