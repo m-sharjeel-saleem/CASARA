@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  BookOpen, GitPullRequest, LayoutDashboard, Radar, Settings, FolderGit2, TrendingUp,
+  BookOpen, GitPullRequest, LayoutDashboard, Radar, Settings, FolderGit2, ShieldCheck, TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/posture", label: "Posture", icon: ShieldCheck },
   { href: "/dashboard/reviews", label: "Reviews", icon: GitPullRequest },
   { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
   { href: "/dashboard/repositories", label: "Repositories", icon: FolderGit2 },

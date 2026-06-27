@@ -4,16 +4,15 @@ import { ArrowRight, Radar, ShieldX } from "lucide-react";
 import Link from "next/link";
 
 import { ConnectionStatus } from "@/components/ConnectionStatus";
-import { MetricsPanel } from "@/components/MetricsPanel";
 import { PageHeader } from "@/components/PageHeader";
+import { PostureHero } from "@/components/Posture";
 import { ReviewCard } from "@/components/ReviewCard";
 import { TriggerBar } from "@/components/TriggerBar";
 import { API_BASE } from "@/lib/api";
-import { useLiveFeed, useReviews, useStats } from "@/lib/hooks";
+import { useLiveFeed, useReviews } from "@/lib/hooks";
 
 export default function Overview() {
   const { data: reviews = [], error, isLoading, mutate } = useReviews();
-  const { data: stats } = useStats();
   useLiveFeed();
 
   return (
@@ -26,15 +25,9 @@ export default function Overview() {
         <TriggerBar onTriggered={() => mutate()} />
 
         {isLoading ? (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="skeleton h-32 rounded-2xl lg:col-span-3" />
-            <div className="skeleton h-32 rounded-2xl lg:col-span-4" />
-            <div className="skeleton h-32 rounded-2xl lg:col-span-2" />
-            <div className="skeleton h-32 rounded-2xl lg:col-span-3" />
-            <div className="skeleton h-24 rounded-2xl lg:col-span-12" />
-          </div>
+          <div className="skeleton h-56 rounded-3xl" />
         ) : (
-          <MetricsPanel stats={stats ?? null} reviews={reviews} />
+          <PostureHero reviews={reviews} />
         )}
 
         {error && (

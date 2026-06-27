@@ -71,8 +71,7 @@ export function ReviewCard({ review, index = 0 }: { review: Review; index?: numb
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index * 0.04, 0.3) }}
-      className={cn("panel overflow-hidden rounded-2xl transition-shadow hover:shadow-tile",
-        top && stripeClass[top])}
+      className={cn("panel lift overflow-hidden rounded-2xl", top && stripeClass[top])}
     >
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-4 p-4 text-left">
         <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl border",
