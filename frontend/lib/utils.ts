@@ -19,6 +19,19 @@ export function riskHex(score: number): string {
   return "#3ee0a3";
 }
 
+/** Security grade (A–F) from composite risk — lower risk is a better grade. */
+export function gradeForRisk(score: number): string {
+  return score < 2 ? "A" : score < 4 ? "B" : score < 6 ? "C" : score < 8 ? "D" : "F";
+}
+export function gradeHex(grade: string): string {
+  return { A: "#3ee0a3", B: "#9ae6b4", C: "#f5c043", D: "#ff8a3d", F: "#ff4d6d" }[grade] ?? "#7c8aa3";
+}
+
+/** A review whose pr_number is 0 is a whole-repo audit, not a PR review. */
+export function isAudit(prNumber: number): boolean {
+  return prNumber === 0;
+}
+
 export const SEV_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
 
 export const SEV_HEX: Record<Severity, string> = {

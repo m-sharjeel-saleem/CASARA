@@ -42,6 +42,19 @@ export const api = {
     return res.json();
   },
 
+  runAudit: async (repo: string) => {
+    const res = await fetch(`${API_BASE}/api/audit/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => null);
+      throw new Error(d?.detail ?? `Audit failed (${res.status})`);
+    }
+    return res.json();
+  },
+
   triggerReview: async (repo: string, prNumber?: number) => {
     const res = await fetch(`${API_BASE}/api/review/run`, {
       method: "POST",

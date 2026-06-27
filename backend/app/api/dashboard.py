@@ -148,6 +148,22 @@ def trigger_review(req: RunRequest, background: BackgroundTasks) -> dict:
     return {"status": "accepted", "repo": repo, "pr": pr_number}
 
 
+class AuditRequest(BaseModel):
+    repo: str = Field(..., examples=["owner/name"])
+
+
+@router.post("/audit/run")
+def trigger_audit(req: AuditRequest, background: BackgroundTasks) -> dict:
+    """Run a whole-repo security audit (full scanner suite over the entire repository)."""
+    from app.services import gh_app
+    from app.services.audit import run_audit
+
+    repo = req.repo.strip().removeprefix("https://github.com/").removeprefix("github.com/").strip("/")
+    installation_id = gh_app.installation_for_repo(repo)
+    background.add_task(run_audit, repo=repo, installation_id=installation_id)
+    return {"status": "accepted", "repo": repo}
+
+
 @router.get("/events")
 async def event_stream():
     """Server-Sent Events feed of review lifecycle events for the dashboard."""

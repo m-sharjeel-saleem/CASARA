@@ -6,14 +6,23 @@ ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
 # git is needed by some scanners; build-essential for any wheels without prebuilts.
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-# Deterministic scanners (pure-pip). Gitleaks is an optional extra binary; depscan
-# (our supply-chain check) is pure-Python and always runs.
-RUN pip install semgrep==1.97.0 bandit==1.8.0
+# Deterministic scanners. Pure-pip: Semgrep (SAST), Bandit (Python), GuardDog (malware/
+# malicious-package detection). depscan (our supply-chain heuristics) is pure-Python.
+RUN pip install semgrep==1.97.0 bandit==1.8.0 guarddog==1.8.0
+
+# Single-binary scanners for the whole-repo audit: OSV-Scanner (dependency vulns from 20+
+# advisory sources) and Trivy (misconfig/IaC + secrets). Installed to /usr/local/bin.
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -sSfL "https://github.com/google/osv-scanner/releases/download/v2.0.2/osv-scanner_linux_${ARCH}" \
+       -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner \
+    && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+       | sh -s -- -b /usr/local/bin v0.58.1 \
+    || echo "scanner binary install best-effort; pipeline degrades gracefully if absent"
 
 COPY app ./app
 

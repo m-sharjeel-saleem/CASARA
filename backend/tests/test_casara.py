@@ -305,6 +305,15 @@ def test_critic_keyless_keeps_all():
     assert critic("some diff", fs) == fs
 
 
+def test_audit_grade_mapping():
+    from app.services.audit import grade_for
+    assert grade_for(0.5) == "A"
+    assert grade_for(3.0) == "B"
+    assert grade_for(5.0) == "C"
+    assert grade_for(7.0) == "D"
+    assert grade_for(9.0) == "F"
+
+
 def test_finding_default_status_open():
     f = _f()
     assert f.status == "open"

@@ -9,7 +9,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 import type { Finding, Review, Severity } from "@/lib/types";
-import { cn, groupBySeverity, riskColor, SEV_HEX, timeAgo, topSeverity } from "@/lib/utils";
+import { cn, gradeForRisk, gradeHex, groupBySeverity, isAudit, riskColor, SEV_HEX, timeAgo, topSeverity } from "@/lib/utils";
 
 const stripeClass: Record<Severity, string> = {
   critical: "stripe-critical", high: "stripe-high", medium: "stripe-medium",
@@ -87,7 +87,9 @@ export function ReviewCard({ review, index = 0 }: { review: Review; index?: numb
           <div className="flex items-center gap-2 text-sm">
             <GitPullRequest className="h-3.5 w-3.5 shrink-0 text-slate-500" />
             <span className="font-mono text-slate-400">{review.repo}</span>
-            <span className="text-slate-600">#{review.pr_number}</span>
+            {isAudit(review.pr_number)
+              ? <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent-soft">Audit</span>
+              : <span className="text-slate-600">#{review.pr_number}</span>}
           </div>
           <div className="mt-0.5 truncate text-[15px] font-medium text-slate-100">
             {review.pr_title || "Pull request"}
@@ -108,6 +110,14 @@ export function ReviewCard({ review, index = 0 }: { review: Review; index?: numb
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
+          {isAudit(review.pr_number) && review.status === "completed" && (
+            <div className="grid h-10 w-10 place-items-center rounded-xl border font-display text-lg font-bold"
+              style={{ color: gradeHex(gradeForRisk(review.risk_score)),
+                borderColor: `${gradeHex(gradeForRisk(review.risk_score))}55`,
+                background: `${gradeHex(gradeForRisk(review.risk_score))}14` }}>
+              {gradeForRisk(review.risk_score)}
+            </div>
+          )}
           <div className="text-right">
             <div className={cn("font-mono text-xl font-bold tnum", riskColor(review.risk_score))}>
               {review.risk_score.toFixed(1)}

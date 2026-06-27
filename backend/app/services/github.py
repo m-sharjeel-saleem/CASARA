@@ -52,6 +52,26 @@ def get_pr(repo: str, pr_number: int, installation_id: int | None = None) -> dic
         return r.json()
 
 
+def get_repo(repo: str, installation_id: int | None = None) -> dict:
+    with httpx.Client(timeout=30) as c:
+        r = c.get(f"{_API}/repos/{repo}", headers=_headers(installation_id=installation_id))
+        r.raise_for_status()
+        return r.json()
+
+
+def download_tarball(repo: str, ref: str, installation_id: int | None = None) -> bytes | None:
+    """Download the whole repo as a gzipped tarball (for full-repo audits)."""
+    try:
+        with httpx.Client(timeout=120, follow_redirects=True) as c:
+            r = c.get(f"{_API}/repos/{repo}/tarball/{ref}",
+                      headers=_headers(installation_id=installation_id))
+            r.raise_for_status()
+            return r.content
+    except httpx.HTTPError as e:
+        log.warning("tarball download failed for %s: %s", repo, e)
+        return None
+
+
 def get_diff(repo: str, pr_number: int, installation_id: int | None = None) -> str:
     with httpx.Client(timeout=30) as c:
         r = c.get(f"{_API}/repos/{repo}/pulls/{pr_number}",
