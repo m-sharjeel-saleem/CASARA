@@ -238,11 +238,14 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
         merged = aggregate(scanner_findings + agent_findings)
         # Grounded critic loop: drop/downgrade likely false positives among AI-only findings.
         merged = analysis.critic(diff, merged)
-        log.info("review %s: critic done (%.1fs)", review.id, _t.monotonic() - t0)
+        # Triage: rank by real-world exploitability; demote noise so it stops inflating the score.
+        merged = analysis.triage(diff, merged)
+        log.info("review %s: critic+triage done (%.1fs)", review.id, _t.monotonic() - t0)
         # Team policy: severity overrides, then noise floor.
         _apply_overrides(merged, cfg.severity_overrides)
         merged = _filter_noise(merged, cfg.noise.min_confidence)
-        merged.sort(key=lambda f: _SEV_ORDER.get(f.severity, 0), reverse=True)
+        # Ordered by priority (set by triage), then severity as a tiebreaker.
+        merged.sort(key=lambda f: (f.priority, _SEV_ORDER.get(f.severity, 0)), reverse=True)
         review.findings = merged
 
         review.risk_score, breakdown = compute_risk(review.findings, files)

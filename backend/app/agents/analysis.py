@@ -12,6 +12,7 @@ from app.agents.prompts import (
     PRIVACY_SYSTEM,
     SECURITY_SYSTEM,
     SUMMARY_SYSTEM,
+    TRIAGE_SYSTEM,
 )
 from app.core.security import wrap_untrusted
 from app.models import Finding
@@ -178,6 +179,51 @@ def critic(diff: str, findings: list[Finding]) -> list[Finding]:
             f.severity = downgrade[i]  # type: ignore[assignment]
         out.append(f)
     return out
+
+
+_EXPLOIT = {"high", "medium", "low", "noise"}
+
+
+def triage(diff: str, findings: list[Finding]) -> list[Finding]:
+    """Rank findings by real-world exploitability in one pass. Sets priority (0-100) and an
+    exploitability label; downgrades 'noise' to info severity so it stops inflating the score.
+    Sorts by priority. Without an LLM backend, applies a sane deterministic priority."""
+    if not findings:
+        return findings
+
+    if not llm.available():
+        for f in findings:  # deterministic fallback: severity drives priority
+            f.priority = {"critical": 95, "high": 80, "medium": 55, "low": 30, "info": 10}.get(f.severity, 40)
+            f.exploitability = f.exploitability or ("high" if f.severity in ("critical", "high") else "medium")
+        findings.sort(key=lambda f: f.priority, reverse=True)
+        return findings
+
+    listing = "\n".join(
+        f"[{i}] {f.severity} {f.cwe_id} {f.file}:{f.line} ({f.source}{' verified' if f.verified else ''}) — {f.message}"
+        for i, f in enumerate(findings)
+    )
+    raw = llm.complete_json(TRIAGE_SYSTEM,
+                            f"Findings:\n{listing}\n\nContext:\n{wrap_untrusted(diff)}")
+    verdicts = raw.get("verdicts", []) if isinstance(raw, dict) else []
+    by_idx = {int(v["index"]): v for v in verdicts if isinstance(v, dict) and "index" in v}
+
+    for i, f in enumerate(findings):
+        v = by_idx.get(i)
+        if not v:
+            f.priority = f.priority or 50
+            continue
+        exp = str(v.get("exploitability", "")).lower()
+        f.exploitability = exp if exp in _EXPLOIT else "medium"
+        try:
+            f.priority = max(0, min(100, int(v.get("priority", 50))))
+        except (TypeError, ValueError):
+            f.priority = 50
+        # Real-world noise stops inflating the risk score / grade, but stays visible.
+        if f.exploitability == "noise" and not f.verified:
+            f.severity = "info"  # type: ignore[assignment]
+            f.cvss_estimate = 1.0
+    findings.sort(key=lambda f: f.priority, reverse=True)
+    return findings
 
 
 def summarize(findings: list[Finding], risk_score: float, gated: bool) -> str:

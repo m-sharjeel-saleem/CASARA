@@ -319,6 +319,21 @@ def test_iac_privacy_agents_keyless():
     assert analysis.privacy_agent("diff", []) == []
 
 
+def test_triage_keyless_deterministic_priority():
+    from app.agents.analysis import triage
+    fs = [_f(severity="low"), _f(severity="critical"), _f(severity="medium")]
+    out = triage("diff", fs)
+    # keyless fallback assigns priority by severity and sorts desc
+    assert out[0].severity == "critical"
+    assert out[0].priority > out[-1].priority
+    assert all(f.priority > 0 for f in out)
+
+
+def test_triage_empty():
+    from app.agents.analysis import triage
+    assert triage("diff", []) == []
+
+
 def test_critic_keyless_keeps_all():
     # No Gemini key → critic returns findings unchanged (graceful).
     from app.agents.analysis import critic

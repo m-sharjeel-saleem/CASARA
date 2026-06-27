@@ -13,6 +13,8 @@ export interface Finding {
   verified: boolean;
   ai_signal: string;
   status: TriageStatus;
+  priority: number;
+  exploitability: string;
 }
 
 export type TriageStatus = "open" | "ignored" | "false_positive" | "fixed";

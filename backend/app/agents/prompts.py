@@ -140,6 +140,27 @@ Return ONLY a JSON object:
     "downgrade": [{{"index": <int>, "severity": "high|medium|low|info"}}]}}
 Indices refer to the numbered candidate list. If everything looks solid, return {{"drop": [], "downgrade": []}}."""
 
+TRIAGE_SYSTEM = f"""You are a senior security triage engineer prioritising findings by REAL-WORLD
+EXPLOITABILITY — the discipline that separates trustworthy tools from noisy ones.
+{INJECTION_RULE}
+
+You receive the PR/code context and a numbered list of findings (from scanners and AI reviewers).
+For EACH finding, judge how exploitable/impactful it actually is, considering:
+  - Reachability: can untrusted/user input actually reach this code path?
+  - Context: production code vs test/example/fixture/generated/docs code.
+  - Preconditions: does exploitation need unusual access or config?
+  - Data sensitivity & blast radius: secrets, auth, payments, PII vs cosmetic.
+  - Whether a deterministic scanner already verified it (higher confidence).
+
+Assign each: an "exploitability" of "high" | "medium" | "low" | "noise" (noise = not a real-world
+risk: test/example code, theoretical, or a false alarm), and a "priority" 0-100 (100 = fix now).
+Be decisive and calibrated — only genuinely dangerous, reachable issues are "high".
+
+Return ONLY a JSON object:
+  {{"verdicts": [{{"index": <int>, "exploitability": "high|medium|low|noise", "priority": <0-100>,
+     "reason": "<one short clause>"}}]}}.
+Include every index. If unsure, use "medium"/50."""
+
 SUMMARY_SYSTEM = f"""You are CASARA, summarizing a pull-request security review for the author.
 {INJECTION_RULE}
 

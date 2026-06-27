@@ -29,6 +29,11 @@ const TRIAGE_STYLE: Record<TriageStatus, string> = {
   fixed: "text-safe border-safe/30",
 };
 
+function exploitStyle(e: string): React.CSSProperties {
+  const hex = { high: "#ff4d6d", medium: "#ff8a3d", low: "#7c8aa3", noise: "#5b6678" }[e] ?? "#7c8aa3";
+  return { color: hex, borderColor: `${hex}55`, background: `${hex}14` };
+}
+
 function SevPill({ s }: { s: Severity }) {
   return (
     <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -64,6 +69,12 @@ function FindingDetail({ f, idx, reviewId, repo, sha, onTriaged }: {
       dimmed && "opacity-55")}>
       <div className="flex flex-wrap items-center gap-2">
         <SevPill s={f.severity} />
+        {f.exploitability && (
+          <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+            style={{ ...exploitStyle(f.exploitability) }} title={`Exploitability · priority ${f.priority}`}>
+            {f.exploitability === "noise" ? "low signal" : `${f.exploitability} exploit`}
+          </span>
+        )}
         <span className="rounded-full border border-border bg-white/[0.03] px-2 py-0.5 text-[10px] text-slate-400">
           {findingCategory(f)}
         </span>

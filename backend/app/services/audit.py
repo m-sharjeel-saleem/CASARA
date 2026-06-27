@@ -161,7 +161,9 @@ def run_audit(repo: str, installation_id: int | None = None) -> Review:
         else:
             raise RuntimeError("could not download repository tarball")
 
-        review.findings = aggregate(findings)
+        # Triage ranks by exploitability and demotes noise. (No critic here: it needs a diff
+        # to validate against; audit findings already come from analysing the real code bundle.)
+        review.findings = analysis.triage("", aggregate(findings))
         review.risk_score, _ = compute_risk(review.findings, [f.file for f in review.findings])
         review.gated, _ = should_gate(review.findings, review.risk_score, cfg.gate.threshold)
         grade = grade_for(review.risk_score)
