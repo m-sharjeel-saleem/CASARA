@@ -29,7 +29,7 @@ RUN ARCH=$(dpkg --print-architecture) \
     || echo "osv-scanner install best-effort"
 RUN ARCH=$(dpkg --print-architecture) \
     && TARCH=$( [ "$ARCH" = "arm64" ] && echo "Linux-ARM64" || echo "Linux-64bit" ) \
-    && curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v0.58.1/trivy_0.58.1_${TARCH}.tar.gz" \
+    && curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v0.71.2/trivy_0.71.2_${TARCH}.tar.gz" \
        -o /tmp/trivy.tgz \
     && tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy && chmod +x /usr/local/bin/trivy \
     && rm -f /tmp/trivy.tgz \
