@@ -7,7 +7,9 @@ system remains useful keyless.
 from app.agents.prompts import (
     AI_CODE_SYSTEM,
     CRITIC_SYSTEM,
+    IAC_SYSTEM,
     LOGIC_SYSTEM,
+    PRIVACY_SYSTEM,
     SECURITY_SYSTEM,
     SUMMARY_SYSTEM,
 )
@@ -82,6 +84,39 @@ def security_agent(diff: str, scanner_findings: list[Finding],
 def logic_agent(diff: str, scanner_findings: list[Finding],
                 custom_instructions: str = "") -> list[Finding]:
     return _agent(LOGIC_SYSTEM, "logic-agent", diff, scanner_findings, custom_instructions)
+
+
+def iac_agent(diff: str, scanner_findings: list[Finding], changed_files: list[str] | None = None,
+              custom_instructions: str = "") -> list[Finding]:
+    """Infrastructure / CI / container security (GitHub Actions supply-chain, Dockerfile, IaC)."""
+    files_note = ("Changed files:\n" + "\n".join(f"- {p}" for p in (changed_files or []))
+                  if changed_files else "")
+    prompt = (f"Scanner findings:\n{_scanner_context(scanner_findings)}{_custom_block(custom_instructions)}\n\n"
+              f"{files_note}\n\nPull-request diff:\n{wrap_untrusted(diff)}")
+    return _parse(llm.complete_json(IAC_SYSTEM, prompt), "iac-agent")
+
+
+def privacy_agent(diff: str, scanner_findings: list[Finding],
+                  custom_instructions: str = "") -> list[Finding]:
+    """Privacy / personal-data handling (PII in logs, plaintext sensitive data, 3rd-party leakage)."""
+    return _agent(PRIVACY_SYSTEM, "privacy-agent", diff, scanner_findings, custom_instructions)
+
+
+# File globs that make the IaC and privacy agents worth running (conditional routing).
+_IAC_HINTS = (".github/workflows/", "dockerfile", ".tf", ".tfvars", "/k8s/", "kubernetes",
+              "docker-compose", ".yaml", ".yml", "helm", "terraform", ".gitlab-ci")
+_PRIVACY_HINTS = ("user", "account", "profile", "auth", "login", "payment", "patient", "customer",
+                  "log", "analytics", "track", "export", "email", "person", "pii", "gdpr")
+
+
+def should_run_iac(files: list[str]) -> bool:
+    blob = " ".join(files).lower()
+    return any(h in blob for h in _IAC_HINTS)
+
+
+def should_run_privacy(files: list[str]) -> bool:
+    blob = " ".join(files).lower()
+    return any(h in blob for h in _PRIVACY_HINTS)
 
 
 def aicode_agent(

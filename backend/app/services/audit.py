@@ -151,6 +151,10 @@ def run_audit(repo: str, installation_id: int | None = None) -> Review:
                         instructions = cfg.instructions_for(used)
                         ai = (analysis.security_agent(bundle, findings, instructions)
                               + analysis.aicode_agent(bundle, findings, used, instructions))
+                        if analysis.should_run_iac(used):
+                            ai += analysis.iac_agent(bundle, findings, used, instructions)
+                        if analysis.should_run_privacy(used):
+                            ai += analysis.privacy_agent(bundle, findings, instructions)
                         log.info("audit %s: AI pass over %d files -> %d findings",
                                  review.id, len(used), len(ai))
                         findings += ai

@@ -298,6 +298,27 @@ def test_llm_no_backend_returns_none():
     assert llm.complete_json("sys", "prompt") is None
 
 
+def test_agent_routing():
+    from app.agents.analysis import should_run_iac, should_run_privacy
+    assert should_run_iac([".github/workflows/ci.yml"]) is True
+    assert should_run_iac(["infra/main.tf"]) is True
+    assert should_run_iac(["src/utils/math.py"]) is False
+    assert should_run_privacy(["app/models/user.py"]) is True
+    assert should_run_privacy(["src/payment/charge.py"]) is True
+    assert should_run_privacy(["src/utils/math.py"]) is False
+
+
+def test_new_agents_in_code_sources():
+    from app.core.risk import CODE_SOURCES
+    assert "iac-agent" in CODE_SOURCES and "privacy-agent" in CODE_SOURCES
+
+
+def test_iac_privacy_agents_keyless():
+    from app.agents import analysis
+    assert analysis.iac_agent("diff", [], [".github/workflows/ci.yml"]) == []
+    assert analysis.privacy_agent("diff", []) == []
+
+
 def test_critic_keyless_keeps_all():
     # No Gemini key → critic returns findings unchanged (graceful).
     from app.agents.analysis import critic

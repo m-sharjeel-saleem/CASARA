@@ -220,12 +220,17 @@ def run_review(repo: str, pr_number: int, pr_title: str, author: str, head_sha: 
                  review.id, len(scanner_findings), _t.monotonic() - t0)
 
         # Orchestrated sub-agents: specialized reviewers run in parallel (I/O-bound LLM calls).
-        with ThreadPoolExecutor(max_workers=3) as ex:
+        # Core agents always run; IaC and privacy agents are routed by file type (cost control).
+        with ThreadPoolExecutor(max_workers=4) as ex:
             futs = [
                 ex.submit(analysis.security_agent, diff, scanner_findings, instructions),
                 ex.submit(analysis.logic_agent, diff, scanner_findings, instructions),
                 ex.submit(analysis.aicode_agent, diff, scanner_findings, files, instructions),
             ]
+            if analysis.should_run_iac(files):
+                futs.append(ex.submit(analysis.iac_agent, diff, scanner_findings, files, instructions))
+            if analysis.should_run_privacy(files):
+                futs.append(ex.submit(analysis.privacy_agent, diff, scanner_findings, instructions))
             agent_findings = [f for fut in futs for f in fut.result()]
         log.info("review %s: agents done, %d findings (%.1fs)",
                  review.id, len(agent_findings), _t.monotonic() - t0)

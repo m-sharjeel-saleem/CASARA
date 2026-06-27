@@ -11,7 +11,8 @@ W_SAST, W_SCA, W_SECRETS, W_CONTEXT = 0.40, 0.25, 0.25, 0.10
 
 # Sources that contribute to the code-security (SAST) dimension. Includes the
 # LLM code agents so the dimension is still meaningful when no scanner is installed.
-CODE_SOURCES = {"semgrep", "bandit", "security-agent", "logic-agent", "ai-code-agent"}
+CODE_SOURCES = {"semgrep", "bandit", "security-agent", "logic-agent", "ai-code-agent",
+                "iac-agent", "privacy-agent"}
 
 # Sources that contribute to the supply-chain (SCA) dimension.
 SCA_SOURCES = {"trivy", "depscan"}
